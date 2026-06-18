@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Openlabeau-logo-nom" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 408.19 408.19">
+  <path d="M115.69,90.63l2.4,131.73" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M115.69,90.63c0-11.37,8.52-17.05,19.89-17.05h105.14c11.37,0,19.89,8.52,19.89,19.89l.59,56.83" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M162.87,69.07v-17.05c0-15.34,11.37-25.01,25.57-25.01s25.57,9.66,25.57,25.01v17.05" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M172.52,136.1h62.51" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M172.52,168.62h62.51" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M172.52,203.79h39.78" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M67.38,241.38c48.31,31.26,93.77,19.89,136.4,2.84,42.62-17.05,82.41-17.05,127.87,5.68" fill="none" stroke="#5aa7dd" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="M92.96,272.64c45.47,31.26,96.61,25.57,142.08,2.84s64.4-22.37,99.61-6.83" fill="none" stroke="#5aa7dd" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <rect x="147.52" y="74.39" width="81.85" height="29.05" rx="4.31" ry="4.31" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <circle cx="150.11" cy="136.1" r="6.25" fill="#163f70"/>
+  <circle cx="150.11" cy="169.44" r="6.25" fill="#163f70"/>
+  <circle cx="150.11" cy="202.79" r="6.25" fill="#163f70"/>
+  <g isolation="isolate">
+    <text transform="translate(35.14 379.55)" fill="#163f70" font-family="Avenir-Medium, Avenir" font-size="54.78" font-weight="500" isolation="isolate"><tspan x="0" y="0">OpenLab’</tspan></text>
+    <text transform="translate(280.68 379.55)" fill="#5aa7dd" font-family="Avenir-Medium, Avenir" font-size="54.78" font-weight="500" isolation="isolate"><tspan x="0" y="0">Eau</tspan></text>
+  </g>
+  <g>
+    <path d="M339.11,124.58l1.03,1.15c3.42,3.8,3.11,9.64-.68,13.06l-57.57,51.83-12.65-15.97,56.8-50.76c3.8-3.42,9.64-3.11,13.06.68Z" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+    <path d="M281.89,190.62l-23.89,8.03,11.24-24,12.65,15.97Z" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+    <path d="M331.44,146l-13.41-14.89" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  </g>
+  <path d="M56.77,216.25c-4.79-15.29-7.38-31.55-7.38-48.42C49.4,78.58,121.75,6.23,211,6.23s161.61,72.35,161.61,161.61c0,16.72-2.54,32.84-7.25,48.01" fill="none" stroke="#163f70" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+</svg>
