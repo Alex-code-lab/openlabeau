@@ -108,10 +108,6 @@ def _s(
     return c
 
 
-def _col_letter(n: int) -> str:
-    return get_column_letter(n)
-
-
 def _apply_template_settings(
     ws, tmpl_path: str, last_col: int, last_row: int, col_first_tube: int = 7
 ) -> bool:

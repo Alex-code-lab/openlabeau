@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from pybaselines import Baseline
 
-from spectrum_loader import load_spectrum_dataframe
+from spectrum_loader import SpectrumLoadError, load_spectrum_dataframe
 
 
 def load_spectrum_file(
@@ -21,28 +21,25 @@ def load_spectrum_file(
         poly_order: ordre du polynôme pour la baseline
 
     Returns:
-        DataFrame avec colonnes ["Raman Shift", "Dark Subtracted #1", "Intensity_corrected", "file"]
-        ou None si erreur / format non reconnu.
+        DataFrame avec colonnes ["Raman Shift", "Dark Subtracted #1",
+        "Intensity_corrected", "file"].
+
+    Raises:
+        SpectrumLoadError: si le fichier est inexploitable.
     """
     try:
-        temp = load_spectrum_dataframe(path)
-        if temp is None:
-            # Debug minimal dans la console
-            print(f"[load_spectrum_file] Spectre non lisible pour {path}.")
-            return None
+        temp = load_spectrum_dataframe(path, raise_errors=True)
 
         if temp.empty:
-            print(
-                f"[load_spectrum_file] Données vides après dropna pour {path}")
-            return None
+            raise SpectrumLoadError("données vides après lecture")
 
         x = temp["Raman Shift"].values
         y = temp["Dark Subtracted #1"].values
 
         # Validation : plage physiquement raisonnable (cm⁻¹)
         if x.min() < -200 or x.max() > 10000:
-            print(
-                f"[load_spectrum_file] Valeurs de Raman Shift suspectes pour {path} "
+            raise SpectrumLoadError(
+                "valeurs de Raman Shift suspectes "
                 f"(min={x.min():.1f}, max={x.max():.1f} cm⁻¹)"
             )
 
@@ -52,9 +49,7 @@ def load_spectrum_file(
                 baseline_fitter = Baseline(x)
                 baseline, _ = baseline_fitter.modpoly(y, poly_order=poly_order)
                 ycorr = y - baseline
-            except Exception as be:
-                print(
-                    f"[load_spectrum_file] Échec baseline pour {path} : {be}")
+            except Exception:
                 baseline = np.zeros_like(y)
                 ycorr = y
         else:
@@ -73,9 +68,10 @@ def load_spectrum_file(
 
         return out.dropna(subset=["Intensity_corrected"])
 
+    except SpectrumLoadError:
+        raise
     except Exception as e:
-        print(f"Erreur lors du chargement de {path}: {e}")
-        return None
+        raise SpectrumLoadError(str(e)) from e
 
 
 def build_combined_dataframe_from_df(
@@ -100,11 +96,13 @@ def build_combined_dataframe_from_df(
     """
     all_data = []
     for path in txt_files:
-        temp = load_spectrum_file(
-            path, poly_order=poly_order, apply_baseline=apply_baseline
-        )
-        if temp is not None:
-            all_data.append(temp)
+        try:
+            temp = load_spectrum_file(
+                path, poly_order=poly_order, apply_baseline=apply_baseline
+            )
+        except SpectrumLoadError as exc:
+            raise SpectrumLoadError(f"{os.path.basename(path)} : {exc}") from exc
+        all_data.append(temp)
 
     if not all_data:
         raise ValueError("Aucun spectre valide n'a été chargé.")

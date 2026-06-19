@@ -36,7 +36,7 @@ from plotly_downloads import (
     sanitize_filename,
     set_plotly_filename,
 )
-from spectrum_loader import load_spectrum
+from spectrum_loader import SpectrumLoadError, load_spectrum
 
 
 class SpectraViewerTab(QWidget):
@@ -177,9 +177,11 @@ class SpectraViewerTab(QWidget):
         spectra: dict[str, tuple] = {}
         failed: list[str] = []
         for path in paths:
-            data = self._spectra.get(path) or load_spectrum(path)
-            if data is None:
-                failed.append(os.path.basename(path))
+            try:
+                data = self._spectra.get(path) or load_spectrum(
+                    path, raise_errors=True)
+            except SpectrumLoadError as exc:
+                failed.append(f"{os.path.basename(path)} ({exc})")
                 continue
             spectra[path] = data
             self._checked.setdefault(path, True)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
 import time
 import urllib.parse
@@ -952,56 +953,6 @@ class MolesDialog(QDialog):
 
     def values(self) -> dict[str, float]:
         return {k: float(spin.value()) for k, spin in self._spins.items()}
-
-
-class AmmoniumTestDialog(QDialog):
-    """Dialogue de saisie des résultats des tests ammonium et du pH."""
-
-    def __init__(self, values: dict | None = None, parent=None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Tests ammonium")
-        values = values or {}
-
-        layout = QVBoxLayout(self)
-        form = QFormLayout()
-
-        self.edit_operator = QLineEdit(
-            str(values.get("operator", "") or ""), self)
-        self.edit_test_1 = QLineEdit(str(values.get("test_1", "") or ""), self)
-        self.edit_test_2 = QLineEdit(str(values.get("test_2", "") or ""), self)
-        self.edit_ph = QLineEdit(str(values.get("ph", "") or ""), self)
-
-        self.edit_operator.setPlaceholderText("Prénom puis nom")
-        self.edit_test_1.setPlaceholderText("Test 1 grossier")
-        self.edit_test_2.setPlaceholderText("Test 2 précis")
-        self.edit_ph.setPlaceholderText("pH")
-        for edit in (
-            self.edit_operator,
-            self.edit_test_1,
-            self.edit_test_2,
-            self.edit_ph,
-        ):
-            _install_field_fill_style(edit)
-
-        form.addRow("Test réalisé par :", self.edit_operator)
-        form.addRow("Valeur du test numéro 1 (grossier) :", self.edit_test_1)
-        form.addRow("Valeur du test numéro 2 (précis) :", self.edit_test_2)
-        form.addRow("Valeur du pH :", self.edit_ph)
-        layout.addLayout(form)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def values(self) -> dict[str, str]:
-        return {
-            "operator": self.edit_operator.text().strip(),
-            "test_1": self.edit_test_1.text().strip(),
-            "test_2": self.edit_test_2.text().strip(),
-            "ph": self.edit_ph.text().strip(),
-        }
 
 
 class _MapPickerBridge(QObject):
@@ -3614,13 +3565,6 @@ class MetadataCreatorWidget(QWidget):
             return str(text or "").strip()
         return f"{hour:02d}:{minute:02d}"
 
-    def _normalize_high_tide_time(self) -> None:
-        if not hasattr(self, "edit_high_tide_time"):
-            return
-        txt = self._time_text(self.edit_high_tide_time)
-        if txt:
-            self._set_time_text(self.edit_high_tide_time, txt)
-
     def _sample_date_text(self) -> str:
         return self._date_time_text(getattr(self, "edit_sample_date", None))
 
@@ -3672,16 +3616,6 @@ class MetadataCreatorWidget(QWidget):
             self._set_date_time_text(self.edit_titration_date, date_part)
         if time_part and hasattr(self, "edit_titration_time"):
             self._set_time_text(self.edit_titration_time, time_part)
-
-    def _normalize_bacterio_deposit_time(self) -> None:
-        if not hasattr(self, "edit_bacterio_deposit_time"):
-            return
-        txt = self._time_text(self.edit_bacterio_deposit_time)
-        if not txt:
-            return
-        normalized = self._normalize_time_text(txt)
-        if normalized != txt:
-            self._set_time_text(self.edit_bacterio_deposit_time, normalized)
 
     def _is_tidal_water_type(self) -> bool:
         if not hasattr(self, "combo_water_type"):
@@ -8230,7 +8164,10 @@ class MetadataCreatorWidget(QWidget):
 
     @staticmethod
     def _ensure_extension(path: str, suffix: str) -> str:
-        return path if path.lower().endswith(suffix) else path + suffix
+        if path.lower().endswith(suffix):
+            return path
+        root, ext = os.path.splitext(path)
+        return root + suffix if ext else path + suffix
 
     def _save_metadata_xlsx(self, path: str) -> None:
         frames = self._metadata_frames_for_save()

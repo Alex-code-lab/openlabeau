@@ -631,8 +631,8 @@ class MainWindow(QMainWindow):
         tabs.addTab(self.spectra_tab, "Visualiseur")
 
         # Onglet Analyse : suivi de la hauteur des pics en fonction de la
-        # concentration de titrant par tube, piloté par la fiche (correspondance
-        # spectres ↔ tubes). Store partagé alimenté depuis « Fichiers Raman ».
+        # quantité de titrant ajoutée, piloté par la fiche (correspondance
+        # spectres ↔ tubes + tableau de volumes).
         self.spectra_store = SpectraStore()
         self.analysis_tab = PeakAnalysisTab(
             self.file_picker, self.metadata_creator, self.spectra_store, self)
