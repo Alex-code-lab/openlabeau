@@ -277,6 +277,57 @@ def compute_concentration_table(df_comp: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out_rows, columns=["Réactif"] + tube_cols)
 
 
+def compute_titrant_amount_table(df_comp: pd.DataFrame) -> pd.DataFrame:
+    """Calcule la quantité de titrant ajoutée dans chaque tube.
+
+    Contrairement à ``compute_concentration_table``, cette valeur n'est pas
+    diluée par le volume final de la cuvette : n = C_stock_titrant * V_titrant.
+    """
+    if df_comp is None or df_comp.empty:
+        raise ValueError("Le tableau des volumes n'est pas encore défini.")
+
+    df = df_comp.copy()
+    if "Réactif" not in df.columns:
+        raise ValueError("La colonne 'Réactif' est introuvable.")
+
+    tube_cols = [c for c in df.columns if c.lower().startswith("tube")]
+    if not tube_cols:
+        raise ValueError(
+            "Le tableau des volumes ne contient pas de colonnes 'Tube X'.")
+
+    names = df["Réactif"].astype(str).str.strip().str.lower()
+    titrant_mask = (
+        names.str.contains("titrant", na=False)
+        | names.str.contains("egta", na=False)
+        | names.isin({"solution b", "solutionb", "sol b", "b"})
+    )
+    if not titrant_mask.any():
+        return pd.DataFrame(columns=["Tube", "[titrant ajouté] (mol)"])
+
+    idx = titrant_mask[titrant_mask].index[0]
+    row = df.loc[idx]
+    c_stock = conc_to_M(row.get("Concentration"), row.get("Unité"))
+    if pd.isna(c_stock):
+        return pd.DataFrame(columns=["Tube", "[titrant ajouté] (mol)"])
+
+    pas = 0.0
+    if "Pas (µL)" in df.columns:
+        pas = pd.to_numeric(pd.Series([row.get("Pas (µL)")]), errors="coerce").iloc[0]
+        if pd.isna(pas):
+            pas = 0.0
+
+    rows = []
+    for col in tube_cols:
+        vol = pd.to_numeric(pd.Series([row.get(col)]), errors="coerce").iloc[0]
+        if pd.isna(vol):
+            amount = float("nan")
+        else:
+            vol_ul = float(vol) * float(pas) if pas > 0 else float(vol)
+            amount = float(c_stock) * vol_ul * 1e-6
+        rows.append({"Tube": col, "[titrant ajouté] (mol)": amount})
+    return pd.DataFrame(rows)
+
+
 # ---------------------------------------------------------------------------
 # Construction des métadonnées fusionnées
 # ---------------------------------------------------------------------------
@@ -371,7 +422,6 @@ def build_merged_metadata(
             conc_wide = conc_wide.reset_index().rename(
                 columns={"Tube": "Tube_merge"})
             meta = meta.merge(conc_wide, on="Tube_merge", how="left")
-            meta = meta.drop(columns=["Tube_merge"])
 
             # Détection automatique du titrant
             titrant_candidates = [
@@ -388,6 +438,17 @@ def build_merged_metadata(
                 meta[titrant] = pd.to_numeric(meta[titrant], errors="coerce")
                 meta["[titrant] (M)"] = meta[titrant]
                 meta["[titrant] (mM)"] = meta[titrant] * 1e3
+
+                amount_df = compute_titrant_amount_table(df_comp)
+                if not amount_df.empty:
+                    amount_df = amount_df.rename(columns={"Tube": "Tube_merge"})
+                    meta = meta.merge(amount_df, on="Tube_merge", how="left")
+                    meta["[titrant ajouté] (nmol)"] = (
+                        pd.to_numeric(
+                            meta["[titrant ajouté] (mol)"], errors="coerce"
+                        )
+                        * 1e9
+                    )
 
     for key, val in header_info.items():
         meta[key] = val

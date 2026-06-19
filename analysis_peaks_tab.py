@@ -2,12 +2,13 @@
 
 Démarche (comme Ramanalyze de base, mais propre et automatique) :
 1. Les spectres viennent de « Fichiers Raman ».
-2. L'abscisse est la **concentration de titrant dans le tube** de chaque spectre,
+2. L'abscisse est la **quantité de titrant ajoutée** dans chaque tube,
    lue automatiquement dans la fiche (correspondance spectres ↔ tubes +
    tableau de volumes). Aucune saisie manuelle.
 3. On détecte les pics (scipy.find_peaks) dans une fenêtre, on les apparie d'un
    spectre à l'autre, et on garde ceux présents dans ≥ X % des spectres.
-4. Pour chaque pic gardé, on suit sa **hauteur** en fonction de la concentration.
+4. Pour chaque pic gardé, on suit sa **hauteur** en fonction de la quantité de
+   titrant ajoutée.
 5. La courbe est plateau → droite → plateau ; on ajuste une sigmoïde et on marque
    la **fin de la droite = équivalence** (seuil de palier réglable).
 """
@@ -22,6 +23,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -51,18 +53,18 @@ from plotly_downloads import (
 
 _PALETTE = ["#0057b8", "#d9534f", "#5cb85c", "#f0ad4e", "#9b59b6",
             "#17a2b8", "#e83e8c", "#6c757d", "#20c997", "#fd7e14"]
-_CONC_UNITS = [("M", 1.0), ("mM", 1e-3), ("µM", 1e-6), ("nM", 1e-9),
-               ("pM", 1e-12)]
+_AMOUNT_UNITS = [("mol", 1.0), ("mmol", 1e-3), ("µmol", 1e-6),
+                 ("nmol", 1e-9), ("pmol", 1e-12), ("fmol", 1e-15)]
 
 
-def _pick_conc_unit(max_M):
-    """Unité de concentration lisible pour la valeur max (en mol/L)."""
-    if not np.isfinite(max_M) or max_M <= 0:
-        return "M", 1.0
-    for label, factor in _CONC_UNITS:
-        if max_M / factor >= 1.0:
+def _pick_amount_unit(max_mol):
+    """Unité de quantité lisible pour la valeur max (en mol)."""
+    if not np.isfinite(max_mol) or max_mol <= 0:
+        return "mol", 1.0
+    for label, factor in _AMOUNT_UNITS:
+        if max_mol / factor >= 1.0:
             return label, factor
-    return _CONC_UNITS[-1]
+    return _AMOUNT_UNITS[-1]
 
 
 def _baseline_corrected(x, y, poly_order=5):
@@ -135,28 +137,24 @@ class PeakAnalysisTab(QWidget):
         self._last_file_base = "suivi_pics"
         self._populating = False
         self._analyzed = False
+        self._peaks_detected = False
 
         left = QWidget(self)
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(8, 8, 8, 8)
-        left_layout.addWidget(QLabel("<b>Suivi des pics vs concentration</b>", left))
+        left_layout.addWidget(
+            QLabel("<b>Suivi des pics vs quantité de titrant ajoutée</b>", left)
+        )
         hint = QLabel(
-            "Les spectres viennent de « Fichiers Raman ». L'abscisse (concentration "
-            "de titrant par tube) est lue automatiquement dans la fiche via la "
-            "correspondance spectres ↔ tubes.", left)
+            "Les spectres viennent de « Fichiers Raman ». L'abscisse (quantité "
+            "de titrant ajoutée = volume de Solution B × concentration stock) "
+            "est lue automatiquement dans la fiche via la correspondance "
+            "spectres ↔ tubes.", left)
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #888;")
         left_layout.addWidget(hint)
 
-        self.btn_load = QPushButton(
-            "↻  Charger / actualiser depuis « Fichiers Raman »", left)
-        self.btn_load.setStyleSheet(
-            "background-color: #0057b8; color: white; font-weight: 700;"
-            " padding: 6px;")
-        self.btn_load.clicked.connect(self.load_from_picker)
-        left_layout.addWidget(self.btn_load)
-
-        self.lbl_files = QLabel("Aucun spectre chargé.", left)
+        self.lbl_files = QLabel("Aucun spectre Raman sélectionné.", left)
         self.lbl_files.setWordWrap(True)
         self.lbl_files.setStyleSheet("color: #555;")
         left_layout.addWidget(self.lbl_files)
@@ -184,6 +182,15 @@ class PeakAnalysisTab(QWidget):
         self.chk_baseline = QCheckBox("Corriger la ligne de base", params)
         self.chk_baseline.setChecked(True)
         form.addRow(self.chk_baseline)
+        for control in (
+            self.spin_min,
+            self.spin_max,
+            self.spin_prom,
+            self.spin_tol,
+            self.spin_presence,
+        ):
+            control.valueChanged.connect(self._mark_detection_stale)
+        self.chk_baseline.toggled.connect(self._mark_detection_stale)
         left_layout.addWidget(params)
 
         self.btn_detect = QPushButton("1) Détecter les pics", left)
@@ -194,6 +201,7 @@ class PeakAnalysisTab(QWidget):
         peaks_layout = QVBoxLayout(peaks_box)
         self.list_peaks = QListWidget(peaks_box)
         self.list_peaks.setMaximumHeight(170)
+        self.list_peaks.itemChanged.connect(self._on_peak_check_changed)
         peaks_layout.addWidget(self.list_peaks)
         check_row = QHBoxLayout()
         btn_all = QPushButton("Tout cocher", peaks_box)
@@ -212,6 +220,12 @@ class PeakAnalysisTab(QWidget):
             "Ajuster (plateau → droite → plateau) et marquer l'équivalence", eq_box)
         self.chk_sigmoid.setChecked(True)
         eq_form.addRow(self.chk_sigmoid)
+        self.combo_fit_peak = QComboBox(eq_box)
+        self.combo_fit_peak.setToolTip(
+            "Choisissez le pic sur lequel appliquer l'ajustement. "
+            "Cela évite de superposer toutes les équivalences sur le graphique."
+        )
+        eq_form.addRow("Ajuster :", self.combo_fit_peak)
         self.spin_plateau = self._spin(eq_box, 50, 99.9, 95.0, " %", 1, 1.0)
         self.spin_plateau.setToolTip(
             "Seuil « nouveau plateau atteint » : l'équivalence est l'abscisse où "
@@ -233,10 +247,16 @@ class PeakAnalysisTab(QWidget):
         self.btn_plot.clicked.connect(self.plot_evolution)
         left_layout.addWidget(self.btn_plot)
 
+        export_row = QHBoxLayout()
         self.btn_export_csv = QPushButton("⬇ Exporter les résultats (CSV)…", left)
         self.btn_export_csv.clicked.connect(self.export_results_csv)
         self.btn_export_csv.setEnabled(False)
-        left_layout.addWidget(self.btn_export_csv)
+        export_row.addWidget(self.btn_export_csv)
+        self.btn_export_xlsx = QPushButton("⬇ Exporter les résultats (XLSX)…", left)
+        self.btn_export_xlsx.clicked.connect(self.export_results_xlsx)
+        self.btn_export_xlsx.setEnabled(False)
+        export_row.addWidget(self.btn_export_xlsx)
+        left_layout.addLayout(export_row)
 
         self.status = QLabel("", left)
         self.status.setStyleSheet("color: #888;")
@@ -265,7 +285,10 @@ class PeakAnalysisTab(QWidget):
         layout.addWidget(splitter)
 
         self.store.changed.connect(self._on_store_changed)
+        if self.file_picker is not None and hasattr(self.file_picker, "selection_changed"):
+            self.file_picker.selection_changed.connect(self._sync_from_picker)
         self._on_store_changed()
+        self._sync_from_picker(silent=True)
 
     @staticmethod
     def _spin(parent, lo, hi, val, suffix, decimals, step):
@@ -278,37 +301,65 @@ class PeakAnalysisTab(QWidget):
         return s
 
     # ------------------------------------------------------------------
-    def load_from_picker(self):
+    def _style_step_button(self, button: QPushButton, done: bool) -> None:
+        color = "#5cb85c" if done else "#d9534f"
+        button.setStyleSheet(
+            f"background-color: {color}; color: white; font-weight: 700; padding: 8px;"
+        )
+
+    def _set_peaks_detected(self, done: bool) -> None:
+        self._peaks_detected = bool(done)
+        self._style_step_button(self.btn_detect, self._peaks_detected)
+
+    def _mark_detection_stale(self, *_args) -> None:
+        if not getattr(self, "_peaks_detected", False) and not self._centers:
+            return
+        self._corr = {}
+        self._centers = []
+        self.list_peaks.clear()
+        self._refresh_fit_combo()
+        self._set_peaks_detected(False)
+        self._set_analyzed(False)
+        self.btn_export_csv.setEnabled(False)
+        self.btn_export_xlsx.setEnabled(False)
+        self.status.setText("Paramètres modifiés : redétectez les pics.")
+
+    def _sync_from_picker(self, *_args, silent: bool = False):
         paths = []
         if self.file_picker is not None and hasattr(
                 self.file_picker, "get_selected_files"):
             paths = self.file_picker.get_selected_files()
         if not paths:
-            QMessageBox.information(
-                self, "Aucun fichier",
-                "Sélectionnez d'abord des fichiers .txt dans « Fichiers Raman ».")
+            self.store.sync_paths([])
+            self.status.setText(
+                "" if silent else "Aucun fichier Raman sélectionné."
+            )
             return
         failed = self.store.sync_paths(paths)
-        self._on_store_changed()
-        msg = f"{len(self.store.paths())} spectre(s) chargé(s)."
+        msg = f"{len(self.store.paths())} spectre(s) Raman synchronisé(s)."
         if failed:
             msg += " Non lisible(s) : " + ", ".join(failed[:3])
-        self.status.setText(msg)
+        if not silent:
+            self.status.setText(msg)
 
     def _on_store_changed(self):
         self._corr = {}
         self._centers = []
         self.list_peaks.clear()
+        self._refresh_fit_combo()
         n = len(self.store.paths())
         self.lbl_files.setText(
-            "Aucun spectre chargé." if n == 0
-            else f"{n} spectre(s) chargé(s). Détectez les pics, puis tracez.")
+            "Aucun spectre Raman sélectionné." if n == 0
+            else f"{n} spectre(s) Raman prêt(s). Détectez les pics, puis tracez.")
+        self._set_peaks_detected(False)
         self.btn_export_csv.setEnabled(False)
+        self.btn_export_xlsx.setEnabled(False)
         self._set_analyzed(False)
 
     # -- contrat de statut d'onglet (compatible avec l'ancien onglet Analyse) --
     def _set_analyzed(self, done: bool) -> None:
         done = bool(done)
+        self._style_step_button(self.btn_plot, done)
         if self._analyzed != done:
             self._analyzed = done
             self.analysis_status_changed.emit(done)
@@ -317,8 +368,8 @@ class PeakAnalysisTab(QWidget):
         self._set_analyzed(False)
 
     # ------------------------------------------------------------------
-    def _titrant_by_path(self):
-        """{path: [titrant] (mol/L)} via la fiche. ({} si indisponible)."""
+    def _titrant_amount_by_path(self):
+        """{path: quantité de titrant ajoutée (mol)} via la fiche."""
         mc = self._metadata_creator
         if mc is None:
             return {}
@@ -326,24 +377,27 @@ class PeakAnalysisTab(QWidget):
             merged = mc.build_merged_metadata()
         except Exception:  # noqa: BLE001
             return {}
-        col = ("[titrant] (M)" if "[titrant] (M)" in merged.columns
-               else None)
+        col = (
+            "[titrant ajouté] (mol)"
+            if "[titrant ajouté] (mol)" in merged.columns
+            else None
+        )
         if col is None or "Spectrum name" not in merged.columns:
             return {}
-        name_to_conc = {}
+        name_to_amount = {}
         for _, r in merged.iterrows():
             try:
-                name_to_conc[str(r["Spectrum name"]).strip()] = float(r[col])
+                name_to_amount[str(r["Spectrum name"]).strip()] = float(r[col])
             except (TypeError, ValueError):
                 continue
         out = {}
         for p in self.store.paths():
             stem = os.path.splitext(self.store.name(p))[0]
-            c = name_to_conc.get(stem)
-            if c is None:
-                c = name_to_conc.get(self.store.name(p))
-            if c is not None and np.isfinite(c):
-                out[p] = c
+            amount = name_to_amount.get(stem)
+            if amount is None:
+                amount = name_to_amount.get(self.store.name(p))
+            if amount is not None and np.isfinite(amount):
+                out[p] = amount
         return out
 
     def _tube_by_path(self):
@@ -379,7 +433,7 @@ class PeakAnalysisTab(QWidget):
         if not self.store.paths():
             QMessageBox.information(
                 self, "Aucun spectre",
-                "Chargez d'abord les spectres (bouton « Charger… »).")
+                "Sélectionnez d'abord des fichiers .txt dans « Fichiers Raman ».")
             return
         wmin, wmax = self.spin_min.value(), self.spin_max.value()
         if wmax <= wmin:
@@ -400,9 +454,12 @@ class PeakAnalysisTab(QWidget):
         self._centers = centers
         self._populate_peak_list()
         if not centers:
+            self._set_peaks_detected(False)
             self.status.setText(
                 "Aucun pic retenu. Baissez la proéminence ou la présence min.")
         else:
+            self._set_peaks_detected(True)
+            self._set_analyzed(False)
             self.status.setText(
                 f"{len(centers)} pic(s) présent(s) dans ≥ "
                 f"{self.spin_presence.value()} % des spectres. Cochez puis tracez.")
@@ -419,11 +476,21 @@ class PeakAnalysisTab(QWidget):
             item.setCheckState(Qt.Checked)
             self.list_peaks.addItem(item)
         self._populating = False
+        self._refresh_fit_combo()
 
     def _set_all_checked(self, checked: bool):
+        self._populating = True
         state = Qt.Checked if checked else Qt.Unchecked
         for i in range(self.list_peaks.count()):
             self.list_peaks.item(i).setCheckState(state)
+        self._populating = False
+        self._refresh_fit_combo()
+
+    def _on_peak_check_changed(self, _item=None):
+        if self._populating:
+            return
+        self._refresh_fit_combo()
+        self._set_analyzed(False)
 
     def _checked_centers(self):
         out = []
@@ -432,6 +499,44 @@ class PeakAnalysisTab(QWidget):
             if it.checkState() == Qt.Checked:
                 out.append(float(it.data(Qt.UserRole)))
         return out
+
+    def _refresh_fit_combo(self):
+        if not hasattr(self, "combo_fit_peak"):
+            return
+        previous = self.combo_fit_peak.currentData()
+        centers = sorted(self._checked_centers())
+        self.combo_fit_peak.blockSignals(True)
+        self.combo_fit_peak.clear()
+        self.combo_fit_peak.addItem("Aucun ajustement", "__none__")
+        for center in centers:
+            self.combo_fit_peak.addItem(f"{center:.0f} cm⁻¹", center)
+        if len(centers) > 1:
+            self.combo_fit_peak.addItem("Tous les pics cochés", "__all__")
+
+        selected = 0
+        for i in range(self.combo_fit_peak.count()):
+            if self.combo_fit_peak.itemData(i) == previous:
+                selected = i
+                break
+        else:
+            selected = 1 if centers else 0
+        self.combo_fit_peak.setCurrentIndex(selected)
+        self.combo_fit_peak.setEnabled(bool(centers))
+        self.combo_fit_peak.blockSignals(False)
+
+    def _fit_centers(self, centers):
+        if not self.chk_sigmoid.isChecked():
+            return set()
+        choice = self.combo_fit_peak.currentData()
+        if choice == "__none__" or choice is None:
+            return set()
+        if choice == "__all__":
+            return set(centers)
+        try:
+            selected = float(choice)
+        except (TypeError, ValueError):
+            return set()
+        return {c for c in centers if np.isclose(c, selected)}
 
     # ------------------------------------------------------------------
     def plot_evolution(self):
@@ -453,22 +558,21 @@ class PeakAnalysisTab(QWidget):
         if not self._corr:
             self._corr = self._corrected_spectra()
 
-        conc = self._titrant_by_path()
-        if not conc:
+        amount = self._titrant_amount_by_path()
+        if not amount:
             QMessageBox.warning(
-                self, "Concentration indisponible",
-                "Impossible de lire la concentration de titrant par tube depuis "
-                "la fiche. Vérifiez le tableau de volumes et la correspondance "
-                "spectres ↔ tubes, et que les noms de fichiers correspondent aux "
-                "noms de spectres.")
+                self, "Quantité de titrant indisponible",
+                "Impossible de lire la quantité de titrant ajoutée depuis la fiche.\n"
+                "Vérifiez le tableau de volumes, la concentration stock de la "
+                "Solution B et la correspondance spectres ↔ tubes.")
             return
-        unit_label, factor = _pick_conc_unit(max(conc.values()))
-        x_title = f"[titrant] dans le tube ({unit_label})"
+        unit_label, factor = _pick_amount_unit(max(amount.values()))
+        x_title = f"Quantité de titrant ajoutée ({unit_label})"
         tol = self.spin_tol.value()
 
-        grp = [p for p in self.store.paths() if p in conc]
-        grp.sort(key=lambda p: conc[p])
-        xs = [conc[p] / factor for p in grp]
+        grp = [p for p in self.store.paths() if p in amount]
+        grp.sort(key=lambda p: amount[p])
+        xs = [amount[p] / factor for p in grp]
         names = [self.store.name(p) for p in grp]
 
         inten = {}
@@ -476,9 +580,9 @@ class PeakAnalysisTab(QWidget):
             x, y = self._corr[p]
             inten[p] = {c: _measure_at(x, y, c, tol) for c in centers}
 
-        do_fit = self.chk_sigmoid.isChecked()
+        fit_centers = self._fit_centers(centers)
         title = (self.edit_title.text().strip()
-                 or f"Hauteur des pics vs [titrant] · "
+                 or f"Hauteur des pics vs quantité de titrant ajoutée · "
                  f"{self.spin_min.value():.0f}–{self.spin_max.value():.0f} cm⁻¹")
         self._last_file_base = "suivi_pics"
 
@@ -494,10 +598,10 @@ class PeakAnalysisTab(QWidget):
                 connectgaps=False, line=dict(width=ps.LINE_WIDTH, color=color),
                 marker=ps.marker(color, ci), text=names,
                 hovertemplate=(f"pic {center:.0f} cm⁻¹<br>%{{text}}<br>"
-                               f"[titrant]=%{{x:.4g}} {unit_label}<br>"
+                               f"titrant ajouté=%{{x:.4g}} {unit_label}<br>"
                                f"I=%{{y:.4g}}<extra></extra>"),
             ))
-            if do_fit:
+            if center in fit_centers:
                 x_eq = self._add_fit(fig, xs, ys, color, f"{center:.0f} cm⁻¹")
                 if x_eq is not None:
                     n_fits += 1
@@ -515,13 +619,14 @@ class PeakAnalysisTab(QWidget):
         self._inten = inten
         self._grp = grp
         self._centers_plotted = centers
-        self._conc = conc
+        self._amount = amount
         self._unit = (unit_label, factor)
         self.btn_export_csv.setEnabled(True)
+        self.btn_export_xlsx.setEnabled(True)
         self._set_analyzed(True)
 
         msg = f"{len(centers)} pic(s) sur {len(grp)} spectre(s)."
-        if do_fit:
+        if fit_centers:
             seuil = self.spin_plateau.value()
             if n_fits:
                 apercu = ", ".join(
@@ -566,11 +671,11 @@ class PeakAnalysisTab(QWidget):
         return x_eq
 
     # ------------------------------------------------------------------
-    def export_results_csv(self):
+    def _results_dataframe(self):
         if self._last_fig is None or not getattr(self, "_grp", None):
             QMessageBox.information(
                 self, "Rien à exporter", "Tracez d'abord la hauteur des pics.")
-            return
+            return None
         unit_label, factor = self._unit
         tubes = self._tube_by_path()
         rows = []
@@ -578,13 +683,18 @@ class PeakAnalysisTab(QWidget):
             row = {
                 "Fichier": self.store.name(p),
                 "Tube": tubes.get(p, ""),
-                f"[titrant] ({unit_label})": self._conc[p] / factor,
+                f"titrant ajouté ({unit_label})": self._amount[p] / factor,
             }
             for c in self._centers_plotted:
                 v = self._inten[p][c]
                 row[f"pic {c:.0f} cm⁻¹"] = None if np.isnan(v) else v
             rows.append(row)
-        df = pd.DataFrame(rows)
+        return pd.DataFrame(rows)
+
+    def export_results_csv(self):
+        df = self._results_dataframe()
+        if df is None:
+            return
         path, _ = QFileDialog.getSaveFileName(
             self, "Exporter les résultats (CSV)",
             os.path.join(os.path.expanduser("~"), "suivi_pics.csv"),
@@ -595,6 +705,35 @@ class PeakAnalysisTab(QWidget):
             path += ".csv"
         try:
             df.to_csv(path, index=False, sep=";", decimal=",")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Export impossible", str(exc))
+            return
+        self.status.setText(
+            f"Résultats exportés : {os.path.basename(path)} ({len(df)} ligne(s)).")
+
+    def export_results_xlsx(self):
+        df = self._results_dataframe()
+        if df is None:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exporter les résultats (XLSX)",
+            os.path.join(os.path.expanduser("~"), "suivi_pics.xlsx"),
+            "Fichiers Excel (*.xlsx)")
+        if not path:
+            return
+        if not path.lower().endswith(".xlsx"):
+            path += ".xlsx"
+        try:
+            from openpyxl.utils import get_column_letter
+
+            with pd.ExcelWriter(path, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="Suivi pics")
+                worksheet = writer.sheets["Suivi pics"]
+                for idx, column in enumerate(df.columns, start=1):
+                    width = max(len(str(column)) + 2, 14)
+                    worksheet.column_dimensions[get_column_letter(idx)].width = min(
+                        width, 40
+                    )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Export impossible", str(exc))
             return

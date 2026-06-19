@@ -15,6 +15,10 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -67,6 +71,26 @@ class SpectraViewerTab(QWidget):
         hint.setStyleSheet("color: #888;")
         left_layout.addWidget(hint)
 
+        axes_box = QGroupBox("Axes", left)
+        axes_layout = QFormLayout(axes_box)
+        self.spin_x_min = self._axis_spin(1150.0, " cm⁻¹", axes_box)
+        self.spin_x_max = self._axis_spin(1500.0, " cm⁻¹", axes_box)
+        self.spin_y_min = self._axis_spin(None, "", axes_box)
+        self.spin_y_max = self._axis_spin(None, "", axes_box)
+        axes_layout.addRow("X min :", self.spin_x_min)
+        axes_layout.addRow("X max :", self.spin_x_max)
+        axes_layout.addRow("Y min :", self.spin_y_min)
+        axes_layout.addRow("Y max :", self.spin_y_max)
+        axes_buttons = QHBoxLayout()
+        self.btn_apply_axes = QPushButton("Appliquer les axes", axes_box)
+        self.btn_apply_axes.clicked.connect(self.refresh_plot)
+        axes_buttons.addWidget(self.btn_apply_axes)
+        self.btn_reset_y = QPushButton("Y auto", axes_box)
+        self.btn_reset_y.clicked.connect(self._reset_y_axis)
+        axes_buttons.addWidget(self.btn_reset_y)
+        axes_layout.addRow(axes_buttons)
+        left_layout.addWidget(axes_box)
+
         self.file_list = QListWidget(left)
         self.file_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.file_list.itemChanged.connect(self._on_item_changed)
@@ -98,6 +122,17 @@ class SpectraViewerTab(QWidget):
         layout.addWidget(splitter)
 
         self._set_plot_done(False)
+
+    @staticmethod
+    def _axis_spin(value: float | None, suffix: str, parent) -> QDoubleSpinBox:
+        spin = QDoubleSpinBox(parent)
+        spin.setRange(-1_000_000, 1_000_000)
+        spin.setDecimals(2)
+        spin.setSingleStep(10.0 if suffix else 100.0)
+        spin.setSpecialValueText("Auto")
+        spin.setSuffix(suffix)
+        spin.setValue(-1_000_000 if value is None else value)
+        return spin
 
     # ------------------------------------------------------------------
     # Contrat workflow (compatible avec l'ancien onglet « Spectres »)
@@ -177,6 +212,22 @@ class SpectraViewerTab(QWidget):
     def _checked_paths(self) -> list[str]:
         return [p for p in self._spectra if self._checked.get(p, True)]
 
+    def _axis_range(self, min_spin: QDoubleSpinBox, max_spin: QDoubleSpinBox):
+        auto = min_spin.minimum()
+        lo = None if min_spin.value() == auto else min_spin.value()
+        hi = None if max_spin.value() == auto else max_spin.value()
+        if lo is None or hi is None:
+            return None
+        if hi <= lo:
+            return None
+        return [lo, hi]
+
+    def _reset_y_axis(self) -> None:
+        auto = self.spin_y_min.minimum()
+        self.spin_y_min.setValue(auto)
+        self.spin_y_max.setValue(auto)
+        self.refresh_plot()
+
     def refresh_plot(self) -> None:
         paths = self._checked_paths()
         fig = go.Figure()
@@ -191,6 +242,8 @@ class SpectraViewerTab(QWidget):
                     line=dict(width=1.6),
                 )
             )
+        x_range = self._axis_range(self.spin_x_min, self.spin_x_max)
+        y_range = self._axis_range(self.spin_y_min, self.spin_y_max)
         fig.update_layout(
             title=(
                 "Spectres Raman" if paths
@@ -202,6 +255,10 @@ class SpectraViewerTab(QWidget):
             template="plotly_white",
             margin=dict(l=60, r=20, t=50, b=50),
         )
+        if x_range is not None:
+            fig.update_xaxes(range=x_range)
+        if y_range is not None:
+            fig.update_yaxes(range=y_range)
         set_plotly_filename(self.plot_view, "spectres")
         config = {
             "toImageButtonOptions": {

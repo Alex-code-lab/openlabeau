@@ -15,25 +15,34 @@ import numpy as np
 import pandas as pd
 
 
-def load_spectrum(path: str):
-    """Retourne (x, y) en numpy, ou None si le fichier n'est pas exploitable."""
+def _find_header(lines: list[str]) -> int:
+    return next(
+        (
+            i
+            for i, line in enumerate(lines)
+            if line.strip().lower().startswith("pixel;")
+        ),
+        0,
+    )
+
+
+def _pick_column(columns, *candidates):
+    normalized = {str(c).strip().replace("\xa0", " ").lower(): c for c in columns}
+    for cand in candidates:
+        if cand in normalized:
+            return normalized[cand]
+    return None
+
+
+def load_spectrum_dataframe(path: str) -> pd.DataFrame | None:
+    """Retourne un DataFrame canonique avec les colonnes Raman utiles."""
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
 
-        # Repérer la ligne d'en-tête "Pixel;" ; sinon on tente la 1re ligne.
-        header_idx = next(
-            (
-                i
-                for i, line in enumerate(lines)
-                if line.strip().lower().startswith("pixel;")
-            ),
-            0,
-        )
-
         df = pd.read_csv(
             path,
-            skiprows=header_idx,
+            skiprows=_find_header(lines),
             sep=";",
             decimal=",",
             encoding="utf-8",
@@ -48,16 +57,10 @@ def load_spectrum(path: str):
         if len(df.columns) and str(df.columns[-1]).startswith("Unnamed"):
             df = df.iloc[:, :-1]
 
-        cols = {c.lower(): c for c in df.columns}
-
-        def pick(*candidates):
-            for cand in candidates:
-                if cand in cols:
-                    return cols[cand]
-            return None
-
-        x_col = pick("raman shift", "raman_shift", "ramanshift", "rshift")
-        y_col = pick(
+        x_col = _pick_column(df.columns, "raman shift", "raman_shift",
+                             "ramanshift", "rshift")
+        y_col = _pick_column(
+            df.columns,
             "dark subtracted #1",
             "spectra_corrected",
             "spectra corrected",
@@ -77,8 +80,33 @@ def load_spectrum(path: str):
             return None
 
         order = np.argsort(x)
-        return x[order], y[order]
+        x = x[order]
+        y = y[order]
+
+        unique_x, inverse = np.unique(x, return_inverse=True)
+        if len(unique_x) < len(x):
+            y_sum = np.zeros(len(unique_x))
+            np.add.at(y_sum, inverse, y)
+            y = y_sum / np.bincount(inverse)
+            x = unique_x
+
+        return pd.DataFrame({
+            "Raman Shift": x,
+            "Dark Subtracted #1": y,
+            "file": os.path.basename(path),
+        })
 
     except Exception as exc:  # noqa: BLE001
-        print(f"[load_spectrum] Erreur sur {os.path.basename(path)} : {exc}")
+        print(f"[load_spectrum_dataframe] Erreur sur {os.path.basename(path)} : {exc}")
         return None
+
+
+def load_spectrum(path: str):
+    """Retourne (x, y) en numpy, ou None si le fichier n'est pas exploitable."""
+    df = load_spectrum_dataframe(path)
+    if df is None:
+        return None
+    return (
+        df["Raman Shift"].to_numpy(dtype=float),
+        df["Dark Subtracted #1"].to_numpy(dtype=float),
+    )

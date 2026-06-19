@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from pybaselines import Baseline
 
+from spectrum_loader import load_spectrum_dataframe
+
 
 def load_spectrum_file(
     path: str, poly_order: int = 5, apply_baseline: bool = True
@@ -23,76 +25,11 @@ def load_spectrum_file(
         ou None si erreur / format non reconnu.
     """
     try:
-        # --- Lecture brute + repérage de la ligne "Pixel;" ---
-        with open(path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        header_idx = next(
-            i for i, line in enumerate(lines) if line.strip().startswith("Pixel;")
-        )
-
-        df = pd.read_csv(
-            path,
-            skiprows=header_idx,
-            sep=";",
-            decimal=",",
-            encoding="utf-8",
-            skipinitialspace=True,
-            na_values=["", " ", "   ", "\t"],
-            keep_default_na=True,
-        )
-
-        # Supprimer dernière colonne si vide / Unnamed
-        if len(df.columns) > 0 and str(df.columns[-1]).startswith("Unnamed"):
-            df = df.iloc[:, :-1]
-
-        # Nettoyage des noms de colonnes (espaces, insécables, etc.)
-        df.columns = [str(c).strip().replace("\xa0", " ") for c in df.columns]
-
-        # Conversion numérique des colonnes texte
-        for col in df.columns:
-            if df[col].dtype == "object":
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-
-        # -------------------------------------------------------
-        # 1) Harmonisation des noms de colonnes spectrales
-        # -------------------------------------------------------
-        cols_lower = {c.lower(): c for c in df.columns}
-
-        # a) Colonne Raman Shift
-        if "Raman Shift" not in df.columns:
-            # Cherche des variantes possibles
-            for cand in ["raman shift", "raman_shift", "rshift", "ramanshift"]:
-                if cand in cols_lower:
-                    df["Raman Shift"] = df[cols_lower[cand]]
-                    break
-
-        # b) Colonne Dark Subtracted #1 (intensité brute utilisée pour
-        # baseline)
-        if "Dark Subtracted #1" not in df.columns:
-            for cand in [
-                "spectra_corrected",
-                "spectra corrected",
-                "intensity",
-                "intensite",
-            ]:
-                if cand in cols_lower:
-                    df["Dark Subtracted #1"] = df[cols_lower[cand]]
-                    break
-
-        # Si après harmonisation on n'a toujours pas les colonnes, on abandonne
-        if not {"Raman Shift", "Dark Subtracted #1"}.issubset(set(df.columns)):
+        temp = load_spectrum_dataframe(path)
+        if temp is None:
             # Debug minimal dans la console
-            print(
-                f"[load_spectrum_file] Colonnes requises absentes pour {path}. "
-                f"Colonnes présentes : {list(df.columns)}"
-            )
+            print(f"[load_spectrum_file] Spectre non lisible pour {path}.")
             return None
-
-        # -------------------------------------------------------
-        # 2) Construction du DataFrame de travail
-        # -------------------------------------------------------
-        temp = df[["Raman Shift", "Dark Subtracted #1"]].copy()
-        temp = temp.dropna(subset=["Raman Shift", "Dark Subtracted #1"])
 
         if temp.empty:
             print(
@@ -102,32 +39,12 @@ def load_spectrum_file(
         x = temp["Raman Shift"].values
         y = temp["Dark Subtracted #1"].values
 
-        # Tri par shift croissant
-        order = np.argsort(x)
-        x = x[order]
-        y = y[order]
-
         # Validation : plage physiquement raisonnable (cm⁻¹)
         if x.min() < -200 or x.max() > 10000:
             print(
                 f"[load_spectrum_file] Valeurs de Raman Shift suspectes pour {path} "
                 f"(min={x.min():.1f}, max={x.max():.1f} cm⁻¹)"
             )
-
-        # Déduplication : si plusieurs points ont le même shift, on conserve la
-        # moyenne
-        unique_x, inverse = np.unique(x, return_inverse=True)
-        if len(unique_x) < len(x):
-            n_dup = len(x) - len(unique_x)
-            print(
-                f"[load_spectrum_file] {n_dup} doublon(s) de Raman Shift détecté(s) "
-                f"dans {path} — moyennage appliqué."
-            )
-            y_dedup = np.zeros(len(unique_x))
-            np.add.at(y_dedup, inverse, y)
-            counts = np.bincount(inverse)
-            y = y_dedup / counts
-            x = unique_x
 
         # Baseline correction (optionnelle)
         if apply_baseline:
