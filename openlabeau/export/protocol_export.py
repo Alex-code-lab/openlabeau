@@ -13,30 +13,16 @@ La mise en forme suit le modèle CitizenSers :
 
 from __future__ import annotations
 
-import os
-import sys
-
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-import metadata_model as mm
-
-
-def _resource_dir() -> str:
-    """Retourne le dossier contenant les ressources embarquées.
-
-    - En mode PyInstaller (onefile/onedir) : sys._MEIPASS (dossier temporaire
-      où PyInstaller extrait les fichiers data).
-    - En mode normal (script Python) : dossier du fichier source.
-    """
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        return sys._MEIPASS
-    return os.path.dirname(os.path.abspath(__file__))
+from openlabeau.metadata import metadata_model as mm
+from openlabeau.paths import asset_path
 
 
 # Chemin du modèle de mise en page (feuille de protocole)
-_TEMPLATE_PATH = os.path.join(_resource_dir(), "assets", "modele_tableau.xlsx")
+_TEMPLATE_PATH = asset_path("modele_tableau.xlsx")
 
 # ── Palette ─────────────────────────────────────────────────────────────
 _TUBE_HDR = PatternFill("solid", fgColor="2E75B6")  # bleu foncé  — volume
@@ -310,7 +296,6 @@ def export_protocol_excel(
     # ── Indices de lignes ───────────────────────────────────────────────────
     ROW_META1 = 1  # nom manip / date / lieu
     ROW_META2 = 2  # coordinateur / opérateur
-    ROW_SEP = 3  # ligne vide
     ROW_HDR = 4  # en-têtes du tableau (pivotés)
     ROW_DATA = 5  # première ligne de données
 

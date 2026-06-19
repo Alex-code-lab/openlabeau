@@ -13,14 +13,20 @@
 #    PySide6 de PyInstaller embarque QtWebEngineProcess et ses ressources dans
 #    le .app. On reste donc en mode "onedir" + BUNDLE (indispensable et fiable
 #    pour WebEngine sur macOS).
-#  - Le dossier "assets" (logos, icônes, modele_tableau.xlsx) est embarqué tel
-#    quel : le code y accède via sys._MEIPASS/assets/... en mode gelé.
+#  - Seuls les assets nécessaires à l'exécution sont embarqués.
 #  - L'icône du .app est openlabeau.icns.
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # --- Données embarquées ---
-datas = [("assets", "assets")]
+datas = [
+    ("assets/modele_tableau.xlsx", "assets"),
+    ("assets/Openlabeau-logo-nom.svg", "assets"),
+    ("assets/Openlabeau-logo-nom.png", "assets"),
+    ("assets/Openlabeau-logo-seul.png", "assets"),
+    ("assets/openlabeau_icons/openlabeau.ico", "assets/openlabeau_icons"),
+    ("assets/openlabeau_icons/openlabeau.icns", "assets/openlabeau_icons"),
+]
 datas += collect_data_files("plotly")          # données du paquet plotly
 
 # --- Imports parfois ratés par l'analyse statique ---

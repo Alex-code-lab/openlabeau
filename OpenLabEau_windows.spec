@@ -13,13 +13,19 @@
 #    PySide6 de PyInstaller embarque automatiquement QtWebEngineProcess et ses
 #    ressources. On reste donc en mode "onedir" (plus fiable que onefile avec
 #    WebEngine).
-#  - Le dossier "assets" (logos, icônes, modele_tableau.xlsx) est embarqué tel
-#    quel : le code y accède via sys._MEIPASS/assets/... en mode gelé.
+#  - Seuls les assets nécessaires à l'exécution sont embarqués.
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # --- Données embarquées ---
-datas = [("assets", "assets")]
+datas = [
+    ("assets/modele_tableau.xlsx", "assets"),
+    ("assets/Openlabeau-logo-nom.svg", "assets"),
+    ("assets/Openlabeau-logo-nom.png", "assets"),
+    ("assets/Openlabeau-logo-seul.png", "assets"),
+    ("assets/openlabeau_icons/openlabeau.ico", "assets/openlabeau_icons"),
+    ("assets/openlabeau_icons/openlabeau.icns", "assets/openlabeau_icons"),
+]
 datas += collect_data_files("plotly")          # données du paquet plotly
 
 # --- Imports parfois ratés par l'analyse statique ---

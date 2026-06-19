@@ -30,13 +30,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from plotly_downloads import (
+from openlabeau.export.plotly_downloads import (
     install_plotly_download_handler,
     load_plotly_html,
     sanitize_filename,
     set_plotly_filename,
 )
-from spectrum_loader import SpectrumLoadError, load_spectrum
+from openlabeau.raman.spectrum_loader import SpectrumLoadError, load_spectrum
 
 
 class SpectraViewerTab(QWidget):

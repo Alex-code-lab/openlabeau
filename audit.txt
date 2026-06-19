@@ -1,0 +1,123 @@
+================================================================================
+ AUDIT DU CODE — OpenLab'Eau
+ Date : 2026-06-19
+ Périmètre : /09_logiciel_OpenLabEau/OpenLabEau (15 modules .py, ~14 000 lignes)
+================================================================================
+
+But : repérer le code mort, ce qui peut être supprimé, simplifié et raccourci.
+
+
+--------------------------------------------------------------------------------
+ 1. CODE MORT À SUPPRIMER (sûr, aucun impact sur le comportement)
+--------------------------------------------------------------------------------
+
+  MODULES
+  [ ] data_processing.py        212 lignes   0 référence
+        -> utilisé seulement par l'ancien onglet Analyse SERS (supprimé).
+        -> le loader unique est désormais spectrum_loader.py.
+  [ ] peak_presets.py            29 lignes   0 référence
+        -> utilisé seulement par la Titration manuelle (supprimée).
+
+  ASSETS PARASITES
+  [ ] assets/logo avec nom.png            doublon de Openlabeau-logo-nom (0 réf)
+  [ ] assets/logo avec nom.svg            idem (0 réf)
+  [ ] assets/Openlabeau-logo-seul@0.5x.png   variante @0.5x non utilisée (0 réf)
+  [ ] assets/styles/styles.qss            en fait du code Python mal nommé,
+                                          jamais chargé (0 réf)
+        (assets/log_openlabeau.ai : 0 réf mais c'est la SOURCE Illustrator,
+         à garder pour l'édition, juste à exclure du build PyInstaller.)
+
+  DÉJÀ FAIT (entre-temps) :
+   - titration_tab.py, analysis_tab.py, spectra_plot.py, peak_selector.py
+     ont bien été retirés. OK.
+
+
+--------------------------------------------------------------------------------
+ 2. SIMPLIFICATIONS
+--------------------------------------------------------------------------------
+
+  [ ] SpectraStore (spectra_store.py) : 170 lignes -> ~50 lignes
+        Depuis que l'analyse est pilotée par la fiche, plus RIEN n'utilise
+        (0 usage externe) :
+          - volumes, series, titrant
+          - save_session, load_session, _pending_meta
+          - add, remove, clear, meta_changed
+        Seuls servent : spectra, sync_paths, changed, paths(), name().
+        -> réduire le store à l'essentiel.
+
+  [ ] Imports / variables inutilisés (pyflakes — code très propre par ailleurs) :
+          - analysis_peaks_tab.py:23  -> QAbstractItemView importé non utilisé
+          - metadata_creator.py:3258  -> variable 'neutral' jamais lue
+          - protocol_export.py:313    -> variable 'ROW_SEP' jamais lue
+
+
+--------------------------------------------------------------------------------
+ 3. LE GROS MORCEAU : metadata_creator.py
+--------------------------------------------------------------------------------
+
+  8 692 lignes, 162 méthodes dans UNE seule classe (> 50 % du projet).
+  C'est le vrai chantier de simplification, mais lourd et délicat.
+
+  Piste : scinder en plusieurs modules / mixins :
+    - construction des champs de l'UI (prélèvement, contexte, mesures…)
+    - sauvegarde / chargement Excel (.xlsx)
+    - modèle de titration (tableau de volumes, concentrations)
+    - géocodage (département / commune via Nominatim)
+    - protocole de paillasse
+
+  ATTENTION : ne rien casser sur la sauvegarde / le rechargement des .xlsx
+  (feuilles Mesures, Index-métadonnées, Titration-*). À faire dans une session
+  dédiée, avec tests d'aller-retour.
+
+
+--------------------------------------------------------------------------------
+ 4. INVENTAIRE DES MODULES (état actuel)
+--------------------------------------------------------------------------------
+
+  metadata_creator.py     8692   (fiche terrain — énorme)
+  main.py                 1081   fenêtre + onglets + thème/QSS + accueil
+  analysis_peaks_tab.py    741   onglet Analyse (suivi pics vs [titrant])
+  metadata_model.py        663   modèle de calcul (volumes/concentrations)
+  protocol_export.py       661   export feuille de protocole .xlsx
+  protocol_dialog.py       656   dialogue protocole (import lazy -> VIVANT)
+  plotly_downloads.py      423   infra Plotly/WebEngine + téléchargement
+  viewer_tab.py            277   onglet Visualiseur
+  data_processing.py       212   *** MORT ***
+  spectra_store.py         170   store (à alléger)
+  file_picker.py           155   onglet Fichiers Raman
+  spectrum_loader.py       137   loader .txt unique (robuste)
+  titrant_utils.py         120   unités + quantité de matière + sigmoïde
+  plot_style.py             65   style graphique commun
+  peak_presets.py           29   *** MORT ***
+
+  outils/ (NON embarqués, scripts autonomes) :
+    analyses_paires.py, generate_doc_pca.py  -> à garder comme utilitaires.
+
+
+--------------------------------------------------------------------------------
+ 5. BILAN CHIFFRÉ
+--------------------------------------------------------------------------------
+
+  Nettoyage SÛR (modules morts + store allégé + imports + assets) :
+     => ~370 lignes de code en moins, plusieurs fichiers supprimés,
+        ZÉRO changement de comportement.
+
+  Refactor metadata_creator.py : potentiellement -1000 à -2000 lignes de
+  complexité perçue (par découpage), mais gros effort -> session dédiée.
+
+
+--------------------------------------------------------------------------------
+ 6. ORDRE D'EXÉCUTION PROPOSÉ
+--------------------------------------------------------------------------------
+
+  1) Nettoyage sûr (rapide) :
+       - supprimer data_processing.py + peak_presets.py
+       - alléger SpectraStore
+       - retirer les 3 imports/variables inutiles
+       - supprimer les assets parasites
+  2) Phase 4 (séparée) : export des résultats AUSSI en .xlsx (mêmes colonnes
+     que le CSV de l'onglet Analyse).
+  3) Validation en conditions réelles (lancer la vraie app).
+  4) (Plus tard, session dédiée) : refactor de metadata_creator.py.
+
+================================================================================

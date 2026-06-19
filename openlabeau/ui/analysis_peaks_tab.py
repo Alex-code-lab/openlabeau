@@ -21,7 +21,6 @@ import plotly.graph_objects as go
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -42,14 +41,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-import plot_style as ps
-import titrant_utils as tu
-from plotly_downloads import (
+from openlabeau.export.plotly_downloads import (
     install_plotly_download_handler,
     load_plotly_html,
     sanitize_filename,
     set_plotly_filename,
 )
+from openlabeau.raman import titrant_utils as tu
+from openlabeau.style import plot_style as ps
 
 _PALETTE = ["#0057b8", "#d9534f", "#5cb85c", "#f0ad4e", "#9b59b6",
             "#17a2b8", "#e83e8c", "#6c757d", "#20c997", "#fd7e14"]

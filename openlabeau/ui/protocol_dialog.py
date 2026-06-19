@@ -34,8 +34,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-import metadata_model as mm
-import protocol_export
+from openlabeau.export import protocol_export
+from openlabeau.metadata import metadata_model as mm
 
 # ── Couleurs actives (identique à protocol_export) ───────────────────────────
 _C_TUBE = QColor("#2E75B6")

@@ -55,7 +55,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-import metadata_model as mm
+from openlabeau.metadata import metadata_model as mm
 
 try:
     from PySide6.QtWebChannel import QWebChannel
@@ -7561,7 +7561,7 @@ class MetadataCreatorWidget(QWidget):
 
         parent_window = self.window() or self
         try:
-            from protocol_dialog import ProtocolDialog
+            from openlabeau.ui.protocol_dialog import ProtocolDialog
 
             dlg = ProtocolDialog(
                 self.df_comp,

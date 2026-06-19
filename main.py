@@ -25,22 +25,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# S'assurer que les imports de modules frères fonctionnent quel que soit l'endroit
-# d'où on lance le script.
-# En mode PyInstaller onefile, sys._MEIPASS pointe vers le dossier d'extraction
-# temporaire où tous les fichiers data sont copiés.
-if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    APP_DIR = sys._MEIPASS
-else:
-    APP_DIR = os.path.dirname(os.path.abspath(__file__))
-if APP_DIR not in sys.path:
-    sys.path.insert(0, APP_DIR)
-
-from analysis_peaks_tab import PeakAnalysisTab
-from file_picker import FilePickerWidget
-from metadata_creator import MetadataCreatorWidget
-from spectra_store import SpectraStore
-from viewer_tab import SpectraViewerTab
+from openlabeau.metadata.metadata_creator import MetadataCreatorWidget
+from openlabeau.paths import asset_path
+from openlabeau.raman.spectra_store import SpectraStore
+from openlabeau.ui.analysis_peaks_tab import PeakAnalysisTab
+from openlabeau.ui.file_picker import FilePickerWidget
+from openlabeau.ui.viewer_tab import SpectraViewerTab
 
 
 class WorkflowStatusTabBar(QTabBar):
@@ -227,14 +217,14 @@ class MainWindow(QMainWindow):
         dpr = screen.devicePixelRatio() if screen else 1.0
         logo_height = 120
         logo_pixmap = _render_svg_pixmap(
-            os.path.join(APP_DIR, "assets", "Openlabeau-logo-nom.svg"),
+            asset_path("Openlabeau-logo-nom.svg"),
             logo_height,
             dpr,
         )
         if logo_pixmap is None:
             # Repli PNG (rendu DPI-aware pour rester net sur Retina)
             png = QPixmap(
-                os.path.join(APP_DIR, "assets", "Openlabeau-logo-nom.png"))
+                asset_path("Openlabeau-logo-nom.png"))
             if not png.isNull():
                 png = png.scaledToHeight(
                     round(logo_height * dpr), Qt.SmoothTransformation)
@@ -1067,13 +1057,9 @@ if __name__ == "__main__":
     _apply_consistent_theme(app)
 
     if sys.platform == "win32":
-        icon_path = os.path.join(
-            APP_DIR, "assets", "openlabeau_icons", "openlabeau.ico"
-        )
+        icon_path = asset_path("openlabeau_icons", "openlabeau.ico")
     else:
-        icon_path = os.path.join(
-            APP_DIR, "assets", "Openlabeau-logo-seul.png"
-        )
+        icon_path = asset_path("Openlabeau-logo-seul.png")
     app.setWindowIcon(QIcon(icon_path))
 
     win = MainWindow()
