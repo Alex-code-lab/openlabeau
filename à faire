@@ -2,7 +2,6 @@ Il faut autoriser que l'appli soit plus petite si l'utilisateur veut que ça le 
 pour l'analyse raman on fait comme ramanalyze simplifié : finalement, plutot qu'une comparaison on va chercher à la variation des pics. 
 Comme dans l'application : /Users/souchaud/Documents/Travail/CitizenSers/02_Spectroscopie/traitement_données/spectroscopie_raman/Ramanalyze-simple
 
-
 Faire un audit de ce qui serait améliorable. 
 
 vérifier que le csv est bien utilisable et bien récupérable. 
