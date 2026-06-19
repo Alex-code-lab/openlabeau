@@ -27,6 +27,7 @@ datas += collect_data_files("plotly")          # données du paquet plotly
 hiddenimports = []
 hiddenimports += collect_submodules("sklearn")
 hiddenimports += collect_submodules("pybaselines")
+hiddenimports += collect_submodules("odf")
 
 # --- Gros paquets présents dans l'environnement mais NON utilisés par l'app ---
 excludes = [

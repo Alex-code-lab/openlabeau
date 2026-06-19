@@ -63,9 +63,9 @@ _C_WARN_FG = QColor("#9C0006")
 # Étapes inactives : grisées mais LISIBLES (thème clair). Ces couleurs sont
 # posées en dur sur les cellules : elles ne dépendent ni de la palette ni du
 # style, donc elles donnent le même rendu sur macOS, Windows et Linux.
-_C_DIM_BG = QColor("#ECECEC")  # fond ombré (gris clair)
-_C_DIM_FG = QColor("#8A8A8A")  # texte ombré (gris moyen, lisible)
-_SS_DIM = "background: #ECECEC; color: #8A8A8A;"
+_C_DIM_BG = QColor("#D3D3D3")  # fond ombré plus sombre
+_C_DIM_FG = QColor("#222222")  # texte sombre, toujours lisible
+_SS_DIM = "background: #D3D3D3; color: #222222;"
 _SS_ACTIVE = "background: transparent;"
 
 _FIXED_COLS = 5  # Réactif | Conc. | Unité (conc.) | Vérif. | Unité (vol.)
@@ -483,7 +483,7 @@ class ProtocolDialog(QDialog):
 
         Retourne :
           ("verif", r_idx)           — vérification solution non cochée
-          ("tube",  r_idx, t_idx)    — coord ou opér non coché pour ce tube
+          ("tube",  r_idx, t_idx, role) — coord ou opér non coché pour ce tube
           ("instruction", key)        — consigne non cochée
           None                       — tout est terminé
         """
@@ -500,8 +500,10 @@ class ProtocolDialog(QDialog):
             for t_idx in range(self._n_tubes):
                 cb_c = self._checks[("coord", r_idx, t_idx)]
                 cb_o = self._checks[("oper", r_idx, t_idx)]
-                if not cb_c.isChecked() or not cb_o.isChecked():
-                    return ("tube", r_idx, t_idx)
+                if not cb_c.isChecked():
+                    return ("tube", r_idx, t_idx, "coord")
+                if not cb_o.isChecked():
+                    return ("tube", r_idx, t_idx, "oper")
         return None
 
     def _active_cols(self, active: tuple) -> set[int]:
@@ -511,9 +513,11 @@ class ProtocolDialog(QDialog):
         if active[0] == "instruction":
             return set(range(self._table.columnCount()))
         t_idx = active[2]
+        role = active[3]
         base = _FIXED_COLS + t_idx * _SUBCOLS
-        # Volume inclus pour montrer la quantité à pipeter
-        return {base + _SUB_VOL, base + _SUB_COORD, base + _SUB_OPER}
+        active_check = base + (_SUB_COORD if role == "coord" else _SUB_OPER)
+        # Volume inclus pour montrer la quantité à pipeter, puis une seule case active.
+        return {base + _SUB_VOL, active_check}
 
     def _refresh_highlights(self):
         """Met à jour l'ombrageage de toute la table selon l'étape courante."""
@@ -549,7 +553,8 @@ class ProtocolDialog(QDialog):
                 "Réactif", f"Ligne {active_r_idx + 1}"
             )
             tube = self._tubes[active[2]]
-            self._lbl_step.setText(f"→ {react}  ·  {tube}")
+            role = "coordinateur" if active[3] == "coord" else "opérateur"
+            self._lbl_step.setText(f"→ {react}  ·  {tube}  ·  validation {role}")
 
         for tr, r_idx in self._r_idx_for_table_row.items():
             same_row = r_idx == active_r_idx

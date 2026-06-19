@@ -20,3 +20,11 @@ dist/
 # Fichiers temporaires
 *.tmp
 ~*
+
+# Exports générés localement par l'application
+exports/
+*_Titration-volumes.csv
+*_Titration-correspondance.csv
+*_Index-m_tadonn_es.csv
+*_Mesures.csv
+PRE_*.xlsx

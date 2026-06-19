@@ -329,7 +329,7 @@ class MainWindow(QMainWindow):
 
 <h3>Parcours recommandé</h3>
 <ol>
-  <li><span class="key">Ma fiche terrain</span> - créez ou rechargez la fiche, puis enregistrez le fichier <span class="mono">.xlsx</span>.</li>
+  <li><span class="key">Ma fiche terrain</span> - créez ou rechargez la fiche, puis enregistrez-la en <span class="mono">.xlsx</span>.</li>
   <li><span class="key">Fichiers Raman</span> - ajoutez les fichiers <span class="mono">.txt</span> si une acquisition Raman/SERS a été réalisée.</li>
   <li><span class="key">Spectres</span> - contrôlez visuellement les spectres et la correction de baseline.</li>
   <li><span class="key">Analyse</span> - choisissez la longueur d'onde du spectromètre, ajustez les ratios et lancez l'ajustement mathématique de la courbe.</li>
@@ -342,7 +342,9 @@ class MainWindow(QMainWindow):
   Le bouton <b>Charger une fiche...</b> est placé en haut pour reprendre
   une fiche existante. Sinon, remplissez les sections de haut en bas.
   Le bouton <b>Enregistrer la fiche...</b> reste en bas de page et propose
-  automatiquement un nom de fichier basé sur le nom du prélèvement :
+  automatiquement un nom de fichier basé sur le nom du prélèvement. Le fichier
+  est enregistré en classeur <span class="mono">.xlsx</span>, un format que
+  LibreOffice Calc peut aussi ouvrir et réenregistrer :
   <span class="mono">NomPrelevement_T_AnBa_TAm.xlsx</span>.
 </p>
 <ul>
@@ -520,8 +522,8 @@ class MainWindow(QMainWindow):
   </li>
   <li>
     En bas de la fiche, cliquez sur <b>Enregistrer…</b>&nbsp;: l'application propose
-    un nom de fichier et crée un fichier Excel (<b>.xlsx</b>) contenant tout ce que
-    vous avez saisi.
+    un nom de fichier et crée un classeur <b>.xlsx</b>, ouvrable aussi avec
+    LibreOffice Calc.
   </li>
 </ol>
 

@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -85,6 +86,46 @@ SHEET_TITRATION_PROTOCOL_STATE_ALIASES = (
     SHEET_TITRATION_PROTOCOL_STATE,
     "EtatProtocole",
 )
+
+
+class NullableTimeEdit(QTimeEdit):
+    """QTimeEdit optionnel : l'état vide est distinct de 00:00."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._empty = True
+        self.setDisplayFormat("HH:mm")
+        super().setTime(QTime(0, 0))
+        self.timeChanged.connect(self._mark_filled)
+
+    def is_empty(self) -> bool:
+        return self._empty
+
+    def clear_time(self) -> None:
+        previous = self.blockSignals(True)
+        self._empty = True
+        super().setTime(QTime(0, 0))
+        self.blockSignals(previous)
+        self.update()
+
+    def setTime(self, time: QTime) -> None:  # noqa: N802 - Qt API
+        self._empty = False
+        super().setTime(time)
+        self.update()
+
+    def stepBy(self, steps: int) -> None:  # noqa: N802 - Qt API
+        self._empty = False
+        super().stepBy(steps)
+        self.update()
+
+    def textFromDateTime(self, date_time: QDateTime) -> str:  # noqa: N802 - Qt API
+        if self._empty:
+            return "à renseigner"
+        return super().textFromDateTime(date_time)
+
+    def _mark_filled(self, *_args) -> None:
+        self._empty = False
+        self.update()
 
 # Numéros officiels des départements français (y.c. outre-mer).
 _FR_DEPT_NAMES: dict[str, str] = {
@@ -224,6 +265,8 @@ def _field_has_value(widget) -> bool:
         if widget.specialValueText() and widget.date() == widget.minimumDate():
             return False
         return True
+    if isinstance(widget, NullableTimeEdit):
+        return not widget.is_empty()
     if isinstance(widget, QTimeEdit):
         if widget.specialValueText() and widget.time() == widget.minimumTime():
             return False
@@ -1105,9 +1148,19 @@ class GaussianVolumesDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Générer un tableau de volume")
-        self.resize(520, 420)
+        self.resize(760, 640)
+        self.setMinimumSize(520, 420)
+        self.setSizeGripEnabled(True)
 
-        layout = QVBoxLayout(self)
+        root_layout = QVBoxLayout(self)
+        content = QWidget(self)
+        layout = QVBoxLayout(content)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setWidget(content)
+        root_layout.addWidget(scroll, 1)
         layout.addWidget(
             QLabel(
                 "Génère automatiquement les volumes de titrant (Solution B) autour de l'équivalence.\n"
@@ -1495,7 +1548,7 @@ class GaussianVolumesDialog(QDialog):
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        root_layout.addWidget(buttons)
 
         # Le mode compte-gouttes est le plus courant : on le coche par défaut.
         # Le signal `toggled` est déjà connecté → cocher applique le preset
@@ -2234,11 +2287,7 @@ class MetadataCreatorWidget(QWidget):
         row2.addWidget(self.edit_sample_date)
 
         row2.addWidget(QLabel("Heure du prélèvement :", self))
-        self.edit_sample_time = QTimeEdit(self)
-        self.edit_sample_time.setDisplayFormat("HH:mm")
-        self.edit_sample_time.setMinimumTime(OPTIONAL_TIME_SENTINEL)
-        self.edit_sample_time.setSpecialValueText("à renseigner")
-        self.edit_sample_time.setTime(OPTIONAL_TIME_SENTINEL)
+        self.edit_sample_time = NullableTimeEdit(self)
         self.edit_sample_time.timeChanged.connect(
             self._on_sample_components_changed)
         self._set_default_on_interaction(self.edit_sample_time, "current_time")
@@ -2358,12 +2407,11 @@ class MetadataCreatorWidget(QWidget):
 
         self.lbl_high_tide_time = QLabel("Heure de pleine mer :", self)
         row_water.addWidget(self.lbl_high_tide_time)
-        self.edit_high_tide_time = QLineEdit(self)
-        self.edit_high_tide_time.setPlaceholderText("ex : 14:35")
-        self.edit_high_tide_time.editingFinished.connect(
-            self._normalize_high_tide_time)
-        self.edit_high_tide_time.textChanged.connect(
+        self.edit_high_tide_time = NullableTimeEdit(self)
+        self.edit_high_tide_time.timeChanged.connect(
             self._on_header_field_changed)
+        self._set_default_on_interaction(
+            self.edit_high_tide_time, "current_time")
         row_water.addWidget(self.edit_high_tide_time)
 
         row_water.addWidget(QLabel("Température de l'eau :", self))
@@ -2613,11 +2661,7 @@ class MetadataCreatorWidget(QWidget):
 
         self.lbl_bacterio_deposit_time = QLabel("Heure du dépôt :", self)
         row_bacterio.addWidget(self.lbl_bacterio_deposit_time)
-        self.edit_bacterio_deposit_time = QTimeEdit(self)
-        self.edit_bacterio_deposit_time.setDisplayFormat("HH:mm")
-        self.edit_bacterio_deposit_time.setMinimumTime(OPTIONAL_TIME_SENTINEL)
-        self.edit_bacterio_deposit_time.setSpecialValueText("à renseigner")
-        self.edit_bacterio_deposit_time.setTime(OPTIONAL_TIME_SENTINEL)
+        self.edit_bacterio_deposit_time = NullableTimeEdit(self)
         self.edit_bacterio_deposit_time.timeChanged.connect(
             self._on_header_field_changed
         )
@@ -2720,11 +2764,7 @@ class MetadataCreatorWidget(QWidget):
         row_titration_place.addWidget(self.edit_titration_date)
 
         row_titration_place.addWidget(QLabel("Heure de la titration :", self))
-        self.edit_titration_time = QTimeEdit(self)
-        self.edit_titration_time.setDisplayFormat("HH:mm")
-        self.edit_titration_time.setMinimumTime(OPTIONAL_TIME_SENTINEL)
-        self.edit_titration_time.setSpecialValueText("à renseigner")
-        self.edit_titration_time.setTime(OPTIONAL_TIME_SENTINEL)
+        self.edit_titration_time = NullableTimeEdit(self)
         self.edit_titration_time.timeChanged.connect(
             self._on_titration_components_changed
         )
@@ -3114,7 +3154,6 @@ class MetadataCreatorWidget(QWidget):
             "edit_coordinator",
             "edit_operator",
             "edit_titration_location",
-            "edit_high_tide_time",
         ):
             w = getattr(self, attr, None)
             if w is not None:
@@ -3143,13 +3182,17 @@ class MetadataCreatorWidget(QWidget):
         # --- Heures → "à renseigner" ---
         for attr in (
             "edit_sample_time",
+            "edit_high_tide_time",
             "edit_bacterio_deposit_time",
             "edit_titration_time",
         ):
             w = getattr(self, attr, None)
             if w is not None:
                 w.blockSignals(True)
-                w.setTime(OPTIONAL_TIME_SENTINEL)
+                if hasattr(w, "clear_time"):
+                    w.clear_time()
+                else:
+                    w.setTime(OPTIONAL_TIME_SENTINEL)
                 w.blockSignals(False)
 
         # --- Combos → valeur de départ ---
@@ -3514,6 +3557,8 @@ class MetadataCreatorWidget(QWidget):
     def _time_text(widget) -> str:
         if widget is None:
             return ""
+        if isinstance(widget, NullableTimeEdit) and widget.is_empty():
+            return ""
         if (
             isinstance(widget, QTimeEdit)
             and widget.specialValueText()
@@ -3534,6 +3579,8 @@ class MetadataCreatorWidget(QWidget):
             return
         txt = str(text or "").strip()
         if not txt:
+            if hasattr(widget, "clear_time"):
+                widget.clear_time()
             return
         if " " in txt:
             txt = txt.rsplit(" ", 1)[-1]
@@ -3570,12 +3617,9 @@ class MetadataCreatorWidget(QWidget):
     def _normalize_high_tide_time(self) -> None:
         if not hasattr(self, "edit_high_tide_time"):
             return
-        txt = self.edit_high_tide_time.text().strip()
-        if not txt:
-            return
-        normalized = self._normalize_time_text(txt)
-        if normalized != txt:
-            self.edit_high_tide_time.setText(normalized)
+        txt = self._time_text(self.edit_high_tide_time)
+        if txt:
+            self._set_time_text(self.edit_high_tide_time, txt)
 
     def _sample_date_text(self) -> str:
         return self._date_time_text(getattr(self, "edit_sample_date", None))
@@ -4250,8 +4294,7 @@ class MetadataCreatorWidget(QWidget):
             tide_coefficient = str(self.spin_tide_coefficient.value())
         high_tide_time = ""
         if tidal and hasattr(self, "edit_high_tide_time"):
-            high_tide_time = self._normalize_time_text(
-                self.edit_high_tide_time.text())
+            high_tide_time = self._time_text(self.edit_high_tide_time)
         water_type = ""
         if hasattr(self, "combo_water_type") and self._is_water_type_selected():
             water_type = self.combo_water_type.currentText().strip()
@@ -7223,8 +7266,7 @@ class MetadataCreatorWidget(QWidget):
             "Heure pleine mer",
             "Pleine mer")
         if high_tide and hasattr(self, "edit_high_tide_time"):
-            self.edit_high_tide_time.setText(
-                self._normalize_time_text(high_tide))
+            self._set_time_text(self.edit_high_tide_time, high_tide)
         self._refresh_tide_fields_enabled()
         self._refresh_water_type_style()
 
@@ -8128,8 +8170,86 @@ class MetadataCreatorWidget(QWidget):
         filename = re.sub(r"_+", "_", filename).strip("_")
         return f"{filename or 'metadonnees'}.xlsx"
 
+    def _metadata_frames_for_save(self) -> dict[str, pd.DataFrame]:
+        """Construit les tables de fiche sans présumer du format de sortie."""
+        if (
+            self.df_map is not None
+            and isinstance(self.df_map, pd.DataFrame)
+            and not self.df_map.empty
+        ):
+            df_map_to_save = self._df_map_with_current_header(self.df_map)
+        else:
+            df_map_to_save = self._header_rows_dataframe()
+
+        if self.df_comp is not None and isinstance(self.df_comp, pd.DataFrame):
+            df_comp_to_save = self.df_comp
+        else:
+            df_comp_to_save = pd.DataFrame()
+
+        frames = {
+            SHEET_TITRATION_VOLUMES: df_comp_to_save,
+            SHEET_TITRATION_CORRESPONDENCE: df_map_to_save,
+            SHEET_METADATA_INDEX: self._metadata_index_dataframe(),
+            SHEET_MEASURES: self._metadata_index_dataframe()[["Champ", "Valeur"]],
+        }
+        if self._protocol_states:
+            frames[SHEET_TITRATION_PROTOCOL_STATE] = self._protocol_states_dataframe()
+        return frames
+
+    def _protocol_states_dataframe(self) -> pd.DataFrame:
+        rows = []
+        for key, val in self._protocol_states.items():
+            if key == "__notes__":
+                rows.append(
+                    {
+                        "type": "__notes__",
+                        "r_idx": -1,
+                        "t_idx": -1,
+                        "checked": str(val),
+                    }
+                )
+            elif key[0] == "verif":
+                rows.append(
+                    {
+                        "type": "verif",
+                        "r_idx": key[1],
+                        "t_idx": -1,
+                        "checked": int(val),
+                    }
+                )
+            else:
+                rows.append(
+                    {
+                        "type": key[0],
+                        "r_idx": key[1],
+                        "t_idx": key[2],
+                        "checked": int(val),
+                    }
+                )
+        return pd.DataFrame(rows, columns=["type", "r_idx", "t_idx", "checked"])
+
+    @staticmethod
+    def _ensure_extension(path: str, suffix: str) -> str:
+        return path if path.lower().endswith(suffix) else path + suffix
+
+    def _save_metadata_xlsx(self, path: str) -> None:
+        frames = self._metadata_frames_for_save()
+        with pd.ExcelWriter(path, engine="openpyxl") as writer:
+            frames[SHEET_TITRATION_VOLUMES].to_excel(
+                writer, sheet_name=SHEET_TITRATION_VOLUMES, index=False
+            )
+            frames[SHEET_TITRATION_CORRESPONDENCE].to_excel(
+                writer, sheet_name=SHEET_TITRATION_CORRESPONDENCE, index=False
+            )
+            if SHEET_TITRATION_PROTOCOL_STATE in frames:
+                frames[SHEET_TITRATION_PROTOCOL_STATE].to_excel(
+                    writer, sheet_name=SHEET_TITRATION_PROTOCOL_STATE, index=False
+                )
+            self._write_measure_summary_sheet(writer.book)
+            self._write_metadata_index_sheet(writer.book)
+
     def _on_save_metadata_clicked(self) -> None:
-        """Enregistre df_comp et df_map dans un fichier Excel."""
+        """Enregistre la fiche terrain dans un classeur Excel."""
         warnings = self._metadata_save_warnings()
         if warnings:
             QMessageBox.warning(
@@ -8143,70 +8263,14 @@ class MetadataCreatorWidget(QWidget):
             self,
             "Enregistrer la fiche terrain",
             self._default_metadata_filename(),
-            "Fichier Excel (*.xlsx)",
+            "Classeur Excel (*.xlsx)",
         )
         if not path:
             return
-        if not path.lower().endswith(".xlsx"):
-            path += ".xlsx"
+        path = self._ensure_extension(path, ".xlsx")
 
         try:
-            if (
-                self.df_map is not None
-                and isinstance(self.df_map, pd.DataFrame)
-                and not self.df_map.empty
-            ):
-                df_map_to_save = self._df_map_with_current_header(self.df_map)
-            else:
-                df_map_to_save = self._header_rows_dataframe()
-            if self.df_comp is not None and isinstance(
-                    self.df_comp, pd.DataFrame):
-                df_comp_to_save = self.df_comp
-            else:
-                df_comp_to_save = pd.DataFrame()
-            with pd.ExcelWriter(path, engine="openpyxl") as writer:
-                df_comp_to_save.to_excel(
-                    writer, sheet_name=SHEET_TITRATION_VOLUMES, index=False
-                )
-                df_map_to_save.to_excel(
-                    writer, sheet_name=SHEET_TITRATION_CORRESPONDENCE, index=False
-                )
-                # État du protocole de paillasse
-                if self._protocol_states:
-                    rows = []
-                    for key, val in self._protocol_states.items():
-                        if key == "__notes__":
-                            rows.append(
-                                {
-                                    "type": "__notes__",
-                                    "r_idx": -1,
-                                    "t_idx": -1,
-                                    "checked": str(val),
-                                }
-                            )
-                        elif key[0] == "verif":
-                            rows.append(
-                                {
-                                    "type": "verif",
-                                    "r_idx": key[1],
-                                    "t_idx": -1,
-                                    "checked": int(val),
-                                }
-                            )
-                        else:
-                            rows.append(
-                                {
-                                    "type": key[0],
-                                    "r_idx": key[1],
-                                    "t_idx": key[2],
-                                    "checked": int(val),
-                                }
-                            )
-                    pd.DataFrame(rows).to_excel(
-                        writer, sheet_name=SHEET_TITRATION_PROTOCOL_STATE, index=False
-                    )
-                self._write_measure_summary_sheet(writer.book)
-                self._write_metadata_index_sheet(writer.book)
+            self._save_metadata_xlsx(path)
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -8221,15 +8285,19 @@ class MetadataCreatorWidget(QWidget):
         )
 
     def _on_load_metadata_clicked(self) -> None:
-        """Charge df_comp et df_map à partir d'un fichier Excel précédemment sauvegardé."""
+        """Charge df_comp et df_map à partir d'un classeur précédemment sauvegardé."""
         path, _ = QFileDialog.getOpenFileName(
-            self, "Charger une fiche terrain", "", "Fichier Excel (*.xlsx)"
+            self,
+            "Charger une fiche terrain",
+            "",
+            "Classeurs (*.xlsx *.ods);;Classeur Excel (*.xlsx);;Classeur LibreOffice Calc (*.ods)",
         )
         if not path:
             return
 
         try:
-            xls = pd.ExcelFile(path)
+            engine = "odf" if path.lower().endswith(".ods") else None
+            xls = pd.ExcelFile(path, engine=engine)
             loaded_comp = False
             loaded_map = False
             loaded_metadata = False
