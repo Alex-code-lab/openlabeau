@@ -627,6 +627,12 @@ class MainWindow(QMainWindow):
         self.analysis_tab = PeakAnalysisTab(
             self.file_picker, self.metadata_creator, self.spectra_store, self)
         tabs.addTab(self.analysis_tab, "Analyse")
+        self.metadata_creator.set_raman_session_provider(
+            self._raman_session_for_save
+        )
+        self.metadata_creator.raman_session_loaded.connect(
+            self._restore_raman_session
+        )
 
         self._copper_titration_tabs = [
             self.file_tab,
@@ -662,6 +668,7 @@ class MainWindow(QMainWindow):
             self._on_analysis_status_changed
         )
         self._refresh_workflow_tab_statuses()
+        self._refresh_downstream_tabs_enabled()
         self._refresh_copper_titration_tabs_visible(
             self.metadata_creator.chk_titration_done.isChecked()
         )
@@ -724,6 +731,30 @@ class MainWindow(QMainWindow):
         )
         self._tab_status[self.file_tab] = ready
         self._set_workflow_tab_status(self.file_tab, ready)
+        self._refresh_downstream_tabs_enabled()
+
+    def _refresh_downstream_tabs_enabled(self) -> None:
+        """Bloque Visualiseur/Analyse tant que les fichiers ne sont pas reliés aux tubes."""
+        ready = bool(
+            getattr(self, "_has_raman_files", False)
+            and getattr(self, "_map_ready", False)
+        )
+        for widget in (getattr(self, "spectra_tab", None),
+                       getattr(self, "analysis_tab", None)):
+            if widget is None:
+                continue
+            idx = self.tabs.indexOf(widget)
+            if idx >= 0:
+                self.tabs.setTabEnabled(idx, ready)
+        if (
+            not ready
+            and self.tabs.currentWidget()
+            in (getattr(self, "spectra_tab", None),
+                getattr(self, "analysis_tab", None))
+        ):
+            file_index = self.tabs.indexOf(self.file_tab)
+            if file_index >= 0:
+                self.tabs.setCurrentIndex(file_index)
 
     def _on_spectra_status_changed(self, plotted: bool) -> None:
         self._tab_status[self.spectra_tab] = bool(plotted)
@@ -735,6 +766,52 @@ class MainWindow(QMainWindow):
     def _on_analysis_status_changed(self, analyzed: bool) -> None:
         self._tab_status[self.analysis_tab] = bool(analyzed)
         self._set_workflow_tab_status(self.analysis_tab, bool(analyzed))
+
+    def _raman_session_for_save(self) -> dict:
+        """État Raman léger à embarquer dans la fiche terrain."""
+        files = (
+            self.file_picker.get_selected_files()
+            if hasattr(self, "file_picker")
+            else []
+        )
+        analysis = (
+            self.analysis_tab.session_state()
+            if hasattr(self, "analysis_tab")
+            else {}
+        )
+        return {
+            "version": 1,
+            "raman_files": files,
+            "analysis": analysis,
+        }
+
+    def _restore_raman_session(self, session: object) -> None:
+        if not isinstance(session, dict):
+            return
+        files = session.get("raman_files", [])
+        if not isinstance(files, list):
+            files = []
+
+        missing = []
+        if files and hasattr(self.file_picker, "restore_selected_files"):
+            missing = self.file_picker.restore_selected_files(files)
+
+        analysis_state = session.get("analysis")
+        if hasattr(self, "analysis_tab") and isinstance(analysis_state, dict):
+            self.analysis_tab.restore_session_state(analysis_state)
+
+        if missing:
+            shown = "\n".join(f"• {path}" for path in missing[:8])
+            more = "\n…" if len(missing) > 8 else ""
+            QMessageBox.warning(
+                self,
+                "Chemins Raman non trouvés",
+                "La fiche contient des chemins vers des fichiers Raman, "
+                "mais certains ne sont plus accessibles sur cette machine.\n\n"
+                f"{shown}{more}\n\n"
+                "Les fichiers retrouvés ont été rechargés. Pour les autres, "
+                "utilisez « Choisir des fichiers Raman (.txt)… ».",
+            )
 
     def _refresh_copper_titration_tabs_visible(self, visible: bool) -> None:
         """Affiche les onglets utiles uniquement à la titration du cuivre."""
@@ -753,6 +830,7 @@ class MainWindow(QMainWindow):
             self.tabs.setTabVisible(idx, visible)
 
         self._refresh_workflow_tab_statuses()
+        self._refresh_downstream_tabs_enabled()
         self._last_tab_index = self.tabs.currentIndex()
 
     def _on_tab_changed(self, index: int) -> None:

@@ -120,6 +120,35 @@ class FilePickerWidget(QWidget):
             self._notify_count()
             self._refresh_selected_list()
 
+    def restore_selected_files(self, paths: list[str]) -> list[str]:
+        """Recharge une sélection sauvegardée.
+
+        Renvoie les chemins qui n'existent plus sur cette machine. Les fichiers
+        retrouvés sont ajoutés à la sélection courante.
+        """
+        missing: list[str] = []
+        found: list[str] = []
+        for path in paths:
+            path = str(path or "").strip()
+            if not path:
+                continue
+            if os.path.isfile(path) and path.lower().endswith(".txt"):
+                found.append(path)
+            else:
+                missing.append(path)
+
+        before = len(self.selected_files)
+        self._add_paths(found)
+        if missing:
+            added = len(self.selected_files) - before
+            self.info.setText(
+                f"{len(self.selected_files)} fichier(s) prêt(s) à tracer ; "
+                f"{len(missing)} chemin(s) non trouvé(s)"
+                if added or self.selected_files
+                else f"{len(missing)} chemin(s) non trouvé(s)"
+            )
+        return missing
+
     def _notify_count(self):
         n = len(self.selected_files)
         if n == 0:

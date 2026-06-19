@@ -366,6 +366,92 @@ class PeakAnalysisTab(QWidget):
     def mark_analysis_stale(self) -> None:
         self._set_analyzed(False)
 
+    def session_state(self) -> dict:
+        """État léger de l'onglet Analyse à sauvegarder avec la fiche."""
+        return {
+            "window_min": self.spin_min.value(),
+            "window_max": self.spin_max.value(),
+            "prominence_percent": self.spin_prom.value(),
+            "tolerance_cm": self.spin_tol.value(),
+            "presence_percent": self.spin_presence.value(),
+            "baseline": self.chk_baseline.isChecked(),
+            "sigmoid": self.chk_sigmoid.isChecked(),
+            "plateau_percent": self.spin_plateau.value(),
+            "title": self.edit_title.text(),
+            "centers": [
+                {"center": float(center), "support": int(support)}
+                for center, support in self._centers
+            ],
+            "checked_centers": [float(c) for c in self._checked_centers()],
+            "fit_choice": self.combo_fit_peak.currentData(),
+            "analyzed": self._analyzed,
+        }
+
+    def restore_session_state(self, state: dict | None) -> None:
+        """Restaure les réglages d'analyse sauvegardés avec la fiche."""
+        if not isinstance(state, dict):
+            return
+        self.spin_min.setValue(float(state.get("window_min", self.spin_min.value())))
+        self.spin_max.setValue(float(state.get("window_max", self.spin_max.value())))
+        self.spin_prom.setValue(
+            float(state.get("prominence_percent", self.spin_prom.value()))
+        )
+        self.spin_tol.setValue(float(state.get("tolerance_cm", self.spin_tol.value())))
+        self.spin_presence.setValue(
+            int(state.get("presence_percent", self.spin_presence.value()))
+        )
+        self.chk_baseline.setChecked(bool(state.get("baseline", True)))
+        self.chk_sigmoid.setChecked(bool(state.get("sigmoid", True)))
+        self.spin_plateau.setValue(
+            float(state.get("plateau_percent", self.spin_plateau.value()))
+        )
+        self.edit_title.setText(str(state.get("title", "")))
+
+        centers = []
+        for item in state.get("centers", []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                centers.append((float(item["center"]), int(item.get("support", 0))))
+            except (KeyError, TypeError, ValueError):
+                continue
+        if centers:
+            self._centers = centers
+            self._populate_peak_list()
+            checked = {
+                round(float(c), 6)
+                for c in state.get("checked_centers", [])
+                if c is not None
+            }
+            if checked:
+                self._populating = True
+                for i in range(self.list_peaks.count()):
+                    item = self.list_peaks.item(i)
+                    center = round(float(item.data(Qt.UserRole)), 6)
+                    item.setCheckState(
+                        Qt.Checked if center in checked else Qt.Unchecked
+                    )
+                self._populating = False
+                self._refresh_fit_combo()
+            fit_choice = state.get("fit_choice")
+            for i in range(self.combo_fit_peak.count()):
+                data = self.combo_fit_peak.itemData(i)
+                if data == fit_choice:
+                    self.combo_fit_peak.setCurrentIndex(i)
+                    break
+                try:
+                    if np.isclose(float(data), float(fit_choice)):
+                        self.combo_fit_peak.setCurrentIndex(i)
+                        break
+                except (TypeError, ValueError):
+                    pass
+            self._set_peaks_detected(True)
+            self._set_analyzed(False)
+            self.status.setText(
+                "Réglages d'analyse restaurés depuis la fiche. "
+                "Cliquez sur « Tracer la hauteur des pics » pour recalculer."
+            )
+
     # ------------------------------------------------------------------
     def _titrant_amount_by_path(self):
         """{path: quantité de titrant ajoutée (mol)} via la fiche."""

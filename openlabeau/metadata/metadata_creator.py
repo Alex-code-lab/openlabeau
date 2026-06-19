@@ -78,6 +78,7 @@ SHEET_METADATA_INDEX = "Index-métadonnées"
 SHEET_TITRATION_VOLUMES = "Titration-volumes"
 SHEET_TITRATION_CORRESPONDENCE = "Titration-correspondance"
 SHEET_TITRATION_PROTOCOL_STATE = "Titration-EtatProtocole"
+SHEET_RAMAN_SESSION = "Session-Raman"
 SHEET_TITRATION_VOLUMES_ALIASES = (SHEET_TITRATION_VOLUMES, "Volumes")
 SHEET_TITRATION_CORRESPONDENCE_ALIASES = (
     SHEET_TITRATION_CORRESPONDENCE,
@@ -87,6 +88,7 @@ SHEET_TITRATION_PROTOCOL_STATE_ALIASES = (
     SHEET_TITRATION_PROTOCOL_STATE,
     "EtatProtocole",
 )
+SHEET_RAMAN_SESSION_ALIASES = (SHEET_RAMAN_SESSION,)
 
 
 class NullableTimeEdit(QTimeEdit):
@@ -1986,6 +1988,7 @@ class GaussianVolumesDialog(QDialog):
 class MetadataCreatorWidget(QWidget):
     titration_visibility_changed = Signal(bool)
     metadata_saved_status_changed = Signal(bool)
+    raman_session_loaded = Signal(object)
     # Émis quand l'état « correspondance spectres ↔ tubes prête » change (vert/rouge
     # du bouton Créer/éditer). Utilisé par MainWindow pour la couleur de l'onglet
     # « Fichiers Raman ».
@@ -2135,17 +2138,17 @@ class MetadataCreatorWidget(QWidget):
         # d'en-tête ou volumes modifiés)
         self.map_dirty: bool = False
         self._metadata_dirty: bool = True
+        self._raman_session_provider = None
         self._protocol_states: dict = {}  # état des cases du protocole de paillasse
         # Options d'affichage pour la correspondance spectres ↔ tubes
-        self._map_include_brb: bool = True
-        self._map_include_control: bool = True
+        self._map_include_control: bool = False
         # Derniers paramètres utilisés dans le dialogue gaussien (mémorisés
         # entre ouvertures)
         self._last_gaussian_params: dict | None = None
         self._last_gaussian_fixed_stock: dict | None = None
         # Cible de contrôle pour la somme des volumes (µL) dans le tableau
         self._sum_target_uL: float = DEFAULT_VTOT_UL
-        self._spec_start_index: int = 0
+        self._spec_start_index: int = 1
         self._ammonium_test_enabled: bool = False
         self._ammonium_test_values: dict[str, str] = {
             "test_1": "",
@@ -2885,9 +2888,6 @@ class MetadataCreatorWidget(QWidget):
 
         titration_workflow_layout.addLayout(btns)
 
-        # Couleurs des boutons selon l'état (rouge si non défini, vert si prêt)
-        self._refresh_button_states()
-
         # --- État ---
         self.lbl_status_comp = QLabel("Tableau des volumes : non défini", self)
         # lbl_status_map est placé dans l'onglet « Fichiers Raman » (voir
@@ -2907,6 +2907,12 @@ class MetadataCreatorWidget(QWidget):
 
         self._setup_fillable_field_styles()
         self._refresh_titration_fields_visible()
+        # Couleurs des boutons selon l'état (rouge si non défini, vert si prêt)
+        self._refresh_button_states()
+
+    def set_raman_session_provider(self, provider) -> None:
+        """Définit la fonction appelée au moment de sauver la session Raman."""
+        self._raman_session_provider = provider
 
     def _setup_fillable_field_styles(self) -> None:
         self._fillable_fields = [
@@ -3217,7 +3223,7 @@ class MetadataCreatorWidget(QWidget):
         if hasattr(self, "edit_debit_flux"):
             self.edit_debit_flux.clear()
         self.map_dirty = False
-        self._spec_start_index = 0
+        self._spec_start_index = 1
         self._last_titration_visibility = None  # force la ré-émission du signal
 
         # --- Labels de statut ---
@@ -3247,6 +3253,58 @@ class MetadataCreatorWidget(QWidget):
     def _on_reset_all_fields_clicked(self) -> None:
         self.reset_all()
 
+    def _df_map_has_valid_mapping(self, df: pd.DataFrame | None = None) -> bool:
+        """Vrai si la correspondance contient au moins une ligne spectre ↔ tube."""
+        target = self.df_map if df is None else df
+        if (
+            target is None
+            or not isinstance(target, pd.DataFrame)
+            or target.empty
+            or not {"Nom du spectre", "Tube"}.issubset(target.columns)
+        ):
+            return False
+
+        work = target.copy()
+        names = work["Nom du spectre"].astype(str).str.strip()
+        tubes = work["Tube"].astype(str).str.strip()
+        header_mask = (names == "Nom du spectre") & (tubes == "Tube")
+        if header_mask.any():
+            last_header_idx = header_mask[header_mask].index[-1]
+            work = work.loc[work.index > last_header_idx].copy()
+
+        n_tubes = self._infer_n_tubes_for_mapping()
+        for _, row in work.iterrows():
+            name = str(row.get("Nom du spectre", "")).strip()
+            tube = str(row.get("Tube", "")).strip()
+            if not name or not tube:
+                continue
+            if name == "Nom du spectre" or tube == "Tube":
+                continue
+            if "brb" in self._norm_text_key(tube):
+                continue
+            if self._tube_merge_key_for_mapping(tube, n_tubes):
+                return True
+        return False
+
+    def _infer_start_index_from_df_map(
+        self, df: pd.DataFrame | None = None
+    ) -> int | None:
+        """Relit l'index initial depuis le premier nom de spectre `..._NN`."""
+        target = self.df_map if df is None else df
+        if (
+            target is None
+            or not isinstance(target, pd.DataFrame)
+            or target.empty
+            or "Nom du spectre" not in target.columns
+        ):
+            return None
+        names = target["Nom du spectre"].astype(str).str.strip()
+        for value in names:
+            match = re.search(r"_(\d+)$", value)
+            if match:
+                return int(match.group(1))
+        return None
+
     def _refresh_button_states(self) -> None:
         """Met à jour la couleur des boutons selon l'état des DataFrames.
 
@@ -3266,6 +3324,7 @@ class MetadataCreatorWidget(QWidget):
             self.df_map is not None
             and isinstance(self.df_map, pd.DataFrame)
             and not self.df_map.empty
+            and self._df_map_has_valid_mapping(self.df_map)
             and not self.map_dirty
         )
 
@@ -3287,6 +3346,11 @@ class MetadataCreatorWidget(QWidget):
             self.btn_edit_comp.setStyleSheet(red)
 
         # Bouton correspondance spectres↔tubes
+        self.btn_edit_map.setText(
+            "Éditer la correspondance spectres ↔ tubes"
+            if map_ready
+            else "Créer la correspondance spectres ↔ tubes"
+        )
         if map_ready:
             self.btn_edit_map.setStyleSheet(green)
         else:
@@ -3317,7 +3381,9 @@ class MetadataCreatorWidget(QWidget):
             else "Rouge = à créer / éditer"
         )
         self.btn_edit_map.setToolTip(
-            "Vert = correspondance définie" if map_ready else "Rouge = à créer / éditer"
+            "Vert = correspondance validée"
+            if map_ready
+            else "Rouge = cliquez, vérifiez le tableau, puis validez avec OK"
         )
         self.btn_save_meta.setToolTip(
             "Vert = fiche enregistrée"
@@ -5715,11 +5781,7 @@ class MetadataCreatorWidget(QWidget):
                 return existing.loc[hdr_idx + 1:].reset_index(drop=True)
             return existing.reset_index(drop=True)
 
-        def _is_brb_label(label: str) -> bool:
-            return "brb" in self._norm_text_key(label)
-
         def _build_initial_df(
-            include_brb: bool,
             include_control: bool,
             existing_df: pd.DataFrame | None,
         ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -5736,7 +5798,6 @@ class MetadataCreatorWidget(QWidget):
             n_tubes = self._infer_n_tubes_for_mapping()
             tube_labels_default = self._default_tube_labels_for_mapping(
                 n_tubes,
-                include_brb_override=include_brb,
                 include_control_override=include_control,
             )
 
@@ -5786,7 +5847,7 @@ class MetadataCreatorWidget(QWidget):
                 for _, row in mapping_rows.iterrows():
                     tube_raw = _clean_text(row.get("Tube", ""))
                     name_raw = _clean_text(row.get("Nom du spectre", ""))
-                    if (not include_brb) and _is_brb_label(tube_raw):
+                    if "brb" in self._norm_text_key(tube_raw):
                         continue
                     tube_key = self._tube_merge_key_for_mapping(
                         tube_raw, n_tubes)
@@ -5874,17 +5935,15 @@ class MetadataCreatorWidget(QWidget):
             )
             return initial_df, reset_df
 
-        # Valeurs par défaut des options BRB / Contrôle
-        include_brb = self._map_include_brb
+        # Valeur par défaut de l'option Contrôle.
         include_control = self._map_include_control
         current_mapping = _extract_mapping_rows(self.df_map)
         if current_mapping is not None and not current_mapping.empty:
             tubes = current_mapping["Tube"].astype(str).str.strip()
-            include_brb = any(_is_brb_label(t) for t in tubes)
             include_control = any(self._is_control_label(t) for t in tubes)
 
         initial_df, reset_df = _build_initial_df(
-            include_brb, include_control, self.df_map
+            include_control, self.df_map
         )
 
         # 5) Ouverture du dialogue d'édition
@@ -5897,19 +5956,16 @@ class MetadataCreatorWidget(QWidget):
             reset_button_text="Reset (valeurs par défaut)",
             show_rename_col=False,
         )
-        # Options : inclure Contrôle BRB / Contrôle (dernier tube)
+        # Options : index de départ et contrôle final.
         opts_layout = QHBoxLayout()
         opts_layout.addWidget(QLabel("Départ index spectres :", dlg))
         spin_start = QSpinBox(dlg)
         spin_start.setRange(0, 999)
         spin_start.setValue(int(self._spec_start_index))
-        spin_start.setToolTip("Index de départ (0 => _00, 7 => _07).")
+        spin_start.setToolTip("Index de départ (0 => _00, 1 => _01).")
         opts_layout.addWidget(spin_start)
-        chk_brb = QCheckBox('Inclure "Contrôle BRB"', dlg)
         chk_ctrl = QCheckBox('Inclure "Contrôle" (dernier tube)', dlg)
-        chk_brb.setChecked(bool(include_brb))
         chk_ctrl.setChecked(bool(include_control))
-        opts_layout.addWidget(chk_brb)
         opts_layout.addWidget(chk_ctrl)
         opts_layout.addStretch(1)
         try:
@@ -5919,21 +5975,19 @@ class MetadataCreatorWidget(QWidget):
 
         def _rebuild_mapping_table() -> None:
             self._spec_start_index = int(spin_start.value())
-            inc_brb = chk_brb.isChecked()
             inc_ctrl = chk_ctrl.isChecked()
             try:
                 current_df = dlg.to_dataframe()
             except Exception:
                 current_df = self.df_map
             new_df, new_reset = _build_initial_df(
-                inc_brb, inc_ctrl, current_df)
+                inc_ctrl, current_df)
             dlg._reset_df = new_reset
             try:
                 dlg._load_from_dataframe(new_df)
             except Exception:
                 pass
 
-        chk_brb.toggled.connect(_rebuild_mapping_table)
         chk_ctrl.toggled.connect(_rebuild_mapping_table)
         spin_start.valueChanged.connect(_rebuild_mapping_table)
         if dlg.exec() != QDialog.Accepted:
@@ -5954,8 +6008,7 @@ class MetadataCreatorWidget(QWidget):
         # derniers champs saisis.
         df = self._apply_header_values_to_df_map(df, manip_name)
 
-        # Mémoriser les options BRB / Contrôle
-        self._map_include_brb = bool(chk_brb.isChecked())
+        # Mémoriser l'option Contrôle. BRB n'est plus généré.
         self._map_include_control = bool(chk_ctrl.isChecked())
 
         self.df_map = df
@@ -6518,7 +6571,6 @@ class MetadataCreatorWidget(QWidget):
     def _sync_df_map_with_df_comp(
         self,
         duplicate_last_override: bool | None = None,
-        include_brb_override: bool | None = None,
         include_control_override: bool | None = None,
         *,
         mark_dirty: bool = True,
@@ -6534,11 +6586,6 @@ class MetadataCreatorWidget(QWidget):
         Par défaut, elle marque la correspondance comme à revoir (pas de validation utilisateur).
         """
         default_cols = ["Nom du spectre", "Tube"]
-        include_brb = (
-            self._map_include_brb
-            if include_brb_override is None
-            else bool(include_brb_override)
-        )
         include_control = (
             self._map_include_control
             if include_control_override is None
@@ -6564,7 +6611,6 @@ class MetadataCreatorWidget(QWidget):
         tube_labels_default = self._default_tube_labels_for_mapping(
             n_tubes,
             duplicate_last_override=duplicate_last_override,
-            include_brb_override=include_brb,
             include_control_override=include_control,
         )
         start_index = int(self._spec_start_index)
@@ -6625,8 +6671,7 @@ class MetadataCreatorWidget(QWidget):
             for _, row in mapping_rows.iterrows():
                 tube_raw = _clean_text(row.get("Tube", ""))
                 name_raw = _clean_text(row.get("Nom du spectre", ""))
-                if (not include_brb) and (
-                        "brb" in self._norm_text_key(tube_raw)):
+                if "brb" in self._norm_text_key(tube_raw):
                     continue
                 tube_key = self._tube_merge_key_for_mapping(tube_raw, n_tubes)
                 if not tube_key:
@@ -6777,16 +6822,14 @@ class MetadataCreatorWidget(QWidget):
         n_tubes: int | None = None,
         *,
         duplicate_last_override: bool | None = None,
-        include_brb_override: bool | None = None,
         include_control_override: bool | None = None,
     ) -> list[str]:
         """Liste de tubes par défaut pour la correspondance.
 
         Convention :
-        - 1er spectre : "Contrôle BRB" (optionnel)
-        - puis tubes expérimentaux :
-            - si duplicat actif : Tube 1..Tube (N-1) + "Contrôle" (réplicat)
-            - sinon             : Tube 1..Tube N
+        - tubes expérimentaux :
+            - option Contrôle cochée : Tube 1..Tube (N-1) + "Contrôle"
+            - option Contrôle décochée : Tube 1..Tube N
         """
         n = (
             self._infer_n_tubes_for_mapping()
@@ -6797,11 +6840,6 @@ class MetadataCreatorWidget(QWidget):
             bool(duplicate_last_override)
             if duplicate_last_override is not None
             else self._infer_duplicate_last_for_mapping(n)
-        )
-        include_brb = (
-            self._map_include_brb
-            if include_brb_override is None
-            else bool(include_brb_override)
         )
         include_control = (
             self._map_include_control
@@ -6816,7 +6854,7 @@ class MetadataCreatorWidget(QWidget):
             tubes = [f"Tube {i}" for i in range(1, n)] + ["Contrôle"]
         else:
             tubes = [f"Tube {i}" for i in range(1, n + 1)]
-        return (["Contrôle BRB"] if include_brb else []) + tubes
+        return tubes
 
     # ------------------------------------------------------------------
     # Calcul du tableau des concentrations à partir des volumes
@@ -8162,6 +8200,37 @@ class MetadataCreatorWidget(QWidget):
                 )
         return pd.DataFrame(rows, columns=["type", "r_idx", "t_idx", "checked"])
 
+    def _raman_session_dataframe(self) -> pd.DataFrame:
+        provider = getattr(self, "_raman_session_provider", None)
+        if provider is None:
+            return pd.DataFrame(columns=["Champ", "Valeur"])
+        try:
+            session = provider()
+        except Exception:
+            session = {}
+        if not isinstance(session, dict) or not session:
+            return pd.DataFrame(columns=["Champ", "Valeur"])
+        return pd.DataFrame(
+            [{"Champ": "json", "Valeur": json.dumps(session, ensure_ascii=False)}]
+        )
+
+    @staticmethod
+    def _raman_session_from_dataframe(df: pd.DataFrame) -> dict:
+        if df is None or df.empty or not {"Champ", "Valeur"}.issubset(df.columns):
+            return {}
+        for _, row in df.iterrows():
+            if str(row.get("Champ", "")).strip() != "json":
+                continue
+            raw = row.get("Valeur", "")
+            if pd.isna(raw):
+                return {}
+            try:
+                data = json.loads(str(raw))
+            except json.JSONDecodeError:
+                return {}
+            return data if isinstance(data, dict) else {}
+        return {}
+
     @staticmethod
     def _ensure_extension(path: str, suffix: str) -> str:
         if path.lower().endswith(suffix):
@@ -8171,6 +8240,7 @@ class MetadataCreatorWidget(QWidget):
 
     def _save_metadata_xlsx(self, path: str) -> None:
         frames = self._metadata_frames_for_save()
+        raman_session = self._raman_session_dataframe()
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
             frames[SHEET_TITRATION_VOLUMES].to_excel(
                 writer, sheet_name=SHEET_TITRATION_VOLUMES, index=False
@@ -8184,6 +8254,11 @@ class MetadataCreatorWidget(QWidget):
                 )
             self._write_measure_summary_sheet(writer.book)
             self._write_metadata_index_sheet(writer.book)
+            if not raman_session.empty:
+                raman_session.to_excel(
+                    writer, sheet_name=SHEET_RAMAN_SESSION, index=False
+                )
+                writer.book[SHEET_RAMAN_SESSION].sheet_state = "hidden"
 
     def _on_save_metadata_clicked(self) -> None:
         """Enregistre la fiche terrain dans un classeur Excel."""
@@ -8284,16 +8359,29 @@ class MetadataCreatorWidget(QWidget):
                         self.df_map = self._merge_header_values_into_df_map(
                             self.df_map, summary_values
                         )
-                    loaded_map = True
+                    loaded_map = self._df_map_has_valid_mapping(self.df_map)
                     loaded_metadata = True
                     self.lbl_status_map.setText(
                         f"Tableau de correspondance : {
                             self.df_map.shape[0]} ligne(s), {
                             self.df_map.shape[1]} colonne(s)"
+                        + ("" if loaded_map else " — à valider")
                     )
                     # Mettre à jour les champs d'en-tête d'après df_map
                     self._update_header_fields_from_df_map()
-                    self.map_dirty = False
+                    start_index = self._infer_start_index_from_df_map(self.df_map)
+                    if start_index is not None:
+                        self._spec_start_index = start_index
+                    self.map_dirty = not loaded_map
+                    if not loaded_map:
+                        QMessageBox.warning(
+                            self,
+                            "Correspondance à valider",
+                            "La fiche contient une feuille de correspondance, "
+                            "mais aucune ligne spectre ↔ tube validée n'a été trouvée.\n"
+                            "Cliquez sur « Créer la correspondance spectres ↔ tubes » "
+                            "puis validez avec OK.",
+                        )
                 elif summary_values:
                     self.df_map = self._merge_header_values_into_df_map(
                         pd.DataFrame(), summary_values
@@ -8364,6 +8452,14 @@ class MetadataCreatorWidget(QWidget):
                         self._protocol_states[(t, ri, ti)] = chk
                     elif t == "instruction":
                         self._protocol_states[("instruction", ri, ti)] = chk
+            session_sheet = _first_existing_sheet(
+                xls.sheet_names, SHEET_RAMAN_SESSION_ALIASES
+            )
+            if session_sheet:
+                session_df = pd.read_excel(xls, sheet_name=session_sheet)
+                session = self._raman_session_from_dataframe(session_df)
+                if session:
+                    self.raman_session_loaded.emit(session)
             if loaded_comp and loaded_map:
                 self._mark_metadata_saved()
             else:
