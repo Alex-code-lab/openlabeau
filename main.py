@@ -36,11 +36,10 @@ else:
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-from analysis_tab import AnalysisTab
+from analysis_peaks_tab import PeakAnalysisTab
 from file_picker import FilePickerWidget
 from metadata_creator import MetadataCreatorWidget
 from spectra_store import SpectraStore
-from titration_tab import TitrationTab
 from viewer_tab import SpectraViewerTab
 
 
@@ -629,22 +628,17 @@ class MainWindow(QMainWindow):
             self.file_picker, self.metadata_creator, self)
         tabs.addTab(self.spectra_tab, "Visualiseur")
 
-        # Onglet Titration (courbe de titration par série, approche simplifiée).
-        # Store partagé alimenté depuis « Fichiers Raman ».
+        # Onglet Analyse : suivi de la hauteur des pics en fonction de la
+        # concentration de titrant par tube, piloté par la fiche (correspondance
+        # spectres ↔ tubes). Store partagé alimenté depuis « Fichiers Raman ».
         self.spectra_store = SpectraStore()
-        self.titration_tab = TitrationTab(
+        self.analysis_tab = PeakAnalysisTab(
             self.file_picker, self.metadata_creator, self.spectra_store, self)
-        tabs.addTab(self.titration_tab, "Titration")
-
-        # Onglet Analyse (ancien moteur SERS ; sera retiré en phase 5)
-        self.analysis_tab = AnalysisTab(
-            self.file_picker, self.metadata_creator, self)
         tabs.addTab(self.analysis_tab, "Analyse")
 
         self._copper_titration_tabs = [
             self.file_tab,
             self.spectra_tab,
-            self.titration_tab,
             self.analysis_tab,
         ]
         self.metadata_creator.titration_visibility_changed.connect(
