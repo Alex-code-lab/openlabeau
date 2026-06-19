@@ -177,9 +177,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("OpenLab'Eau — mesure citoyenne de la qualité de l'eau")
         self.resize(1200, 800)
-        # Fixer la largeur de la fenêtre pour éviter qu'elle ne s'agrandisse en fonction du contenu,
-        # tout en permettant à l'utilisateur de modifier la hauteur.
-        self.setMinimumSize(1200, 600)
+        # Taille de départ confortable (1200x800), mais l'utilisateur·ice peut
+        # réduire la fenêtre s'il/elle le souhaite (ex. côte à côte avec une
+        # autre appli). En dessous de la largeur du contenu, un défilement
+        # horizontal apparaît au besoin (voir l'onglet « Ma fiche terrain »).
+        self.setMinimumSize(800, 520)
 
         # --- Status bar ---
         self.setStatusBar(QStatusBar(self))
@@ -584,8 +586,10 @@ class MainWindow(QMainWindow):
 
         metadata_scroll = QScrollArea(self.metadata_tab)
         metadata_scroll.setWidgetResizable(True)
+        # Défilement horizontal au besoin : si la fenêtre est plus étroite que
+        # le formulaire, on défile au lieu de couper le contenu.
         metadata_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
         self.metadata_creator = MetadataCreatorWidget(metadata_scroll)
         metadata_scroll.setWidget(self.metadata_creator)
