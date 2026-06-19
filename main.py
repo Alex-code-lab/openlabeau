@@ -39,7 +39,7 @@ if APP_DIR not in sys.path:
 from analysis_tab import AnalysisTab
 from file_picker import FilePickerWidget
 from metadata_creator import MetadataCreatorWidget
-from spectra_plot import SpectraTab
+from viewer_tab import SpectraViewerTab
 
 
 class WorkflowStatusTabBar(QTabBar):
@@ -622,10 +622,10 @@ class MainWindow(QMainWindow):
         file_layout.addWidget(map_step)
         tabs.addTab(self.file_tab, "Fichiers Raman")
 
-        # Onglet Spectres
-        self.spectra_tab = SpectraTab(
+        # Onglet Visualiseur (affichage des spectres bruts ; remplace « Spectres »)
+        self.spectra_tab = SpectraViewerTab(
             self.file_picker, self.metadata_creator, self)
-        tabs.addTab(self.spectra_tab, "Spectres")
+        tabs.addTab(self.spectra_tab, "Visualiseur")
 
         # Onglet Analyse
         self.analysis_tab = AnalysisTab(
