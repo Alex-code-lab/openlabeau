@@ -1,3 +1,4 @@
+import html
 import os
 import sys
 
@@ -7,6 +8,7 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
+    QFileDialog,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QStatusBar,
     QStyle,
     QStyleOptionTab,
@@ -592,6 +595,17 @@ class MainWindow(QMainWindow):
         # Onglet Fichiers Raman
         self.file_tab = QWidget(self)
         file_layout = QVBoxLayout(self.file_tab)
+        self.copper_file_status_label = QLabel("", self.file_tab)
+        self.copper_file_status_label.setWordWrap(False)
+        self.copper_file_status_label.setFixedHeight(28)
+        self.copper_file_status_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Fixed
+        )
+        self.copper_file_status_label.setStyleSheet(
+            "background: #ffffff; border: 1px solid #dde3ec; border-radius: 5px;"
+            "padding: 3px 8px; color: #243b53; font-weight: 650;"
+        )
+        file_layout.addWidget(self.copper_file_status_label)
         self.file_picker = FilePickerWidget(self.file_tab)
         file_layout.addWidget(self.file_picker, 1)
 
@@ -630,8 +644,17 @@ class MainWindow(QMainWindow):
         self.metadata_creator.set_raman_session_provider(
             self._raman_session_for_save
         )
+        self.metadata_creator.set_raman_analysis_provider(
+            self._raman_analysis_for_save
+        )
         self.metadata_creator.raman_session_loaded.connect(
             self._restore_raman_session
+        )
+        self.metadata_creator.metadata_load_finished.connect(
+            self._on_metadata_load_finished
+        )
+        self.metadata_creator.btn_export_report.clicked.connect(
+            self._on_export_report_clicked
         )
 
         self._copper_titration_tabs = [
@@ -651,6 +674,11 @@ class MainWindow(QMainWindow):
         # L'onglet « Fichiers Raman » est vert seulement si des fichiers .txt
         # sont choisis ET la correspondance spectres ↔ tubes est prête (verte).
         self._has_raman_files = False
+        self._last_raman_restore = {
+            "present": False,
+            "found": 0,
+            "missing": 0,
+        }
         self._map_ready = bool(
             getattr(self.metadata_creator, "_last_map_ready", False)
         )
@@ -703,10 +731,12 @@ class MainWindow(QMainWindow):
     def _refresh_workflow_tab_statuses(self) -> None:
         for widget, ready in getattr(self, "_tab_status", {}).items():
             self._set_workflow_tab_status(widget, ready)
+        self._refresh_global_workflow_status()
 
     def _on_metadata_status_changed(self, saved: bool) -> None:
         self._tab_status[self.metadata_tab] = bool(saved)
         self._set_workflow_tab_status(self.metadata_tab, bool(saved))
+        self._refresh_global_workflow_status()
 
     def _on_file_selection_changed(self, has_files: bool) -> None:
         self._has_raman_files = bool(has_files)
@@ -732,6 +762,7 @@ class MainWindow(QMainWindow):
         self._tab_status[self.file_tab] = ready
         self._set_workflow_tab_status(self.file_tab, ready)
         self._refresh_downstream_tabs_enabled()
+        self._refresh_global_workflow_status()
 
     def _refresh_downstream_tabs_enabled(self) -> None:
         """Bloque Visualiseur/Analyse tant que les fichiers ne sont pas reliés aux tubes."""
@@ -759,6 +790,7 @@ class MainWindow(QMainWindow):
     def _on_spectra_status_changed(self, plotted: bool) -> None:
         self._tab_status[self.spectra_tab] = bool(plotted)
         self._set_workflow_tab_status(self.spectra_tab, bool(plotted))
+        self._refresh_global_workflow_status()
         if not plotted and hasattr(self, "analysis_tab"):
             self.analysis_tab.mark_analysis_stale()
             self._on_analysis_status_changed(False)
@@ -766,6 +798,84 @@ class MainWindow(QMainWindow):
     def _on_analysis_status_changed(self, analyzed: bool) -> None:
         self._tab_status[self.analysis_tab] = bool(analyzed)
         self._set_workflow_tab_status(self.analysis_tab, bool(analyzed))
+        self._refresh_global_workflow_status()
+
+    def _workflow_state_labels(self) -> list[str]:
+        mc = getattr(self, "metadata_creator", None)
+        volume_ok = bool(
+            mc is not None
+            and mc.df_comp is not None
+            and hasattr(mc.df_comp, "empty")
+            and not mc.df_comp.empty
+        )
+        map_ok = bool(getattr(self, "_map_ready", False))
+        files_ok = bool(getattr(self, "_has_raman_files", False))
+        analysis_ok = bool(
+            getattr(self, "_tab_status", {}).get(
+                getattr(self, "analysis_tab", None), False
+            )
+        )
+        metadata_saved = bool(
+            getattr(self, "_tab_status", {}).get(
+                getattr(self, "metadata_tab", None), False
+            )
+        )
+        return [
+            "Fiche OK" if metadata_saved else "Fiche à enregistrer",
+            "Volumes OK" if volume_ok else "Volumes à créer",
+            "Correspondance OK" if map_ok else "Correspondance à valider",
+            "Spectres OK" if files_ok else "Spectres à choisir",
+            "Analyse OK" if analysis_ok else "Analyse à refaire",
+        ]
+
+    def _refresh_global_workflow_status(self) -> None:
+        text = " · ".join(self._workflow_state_labels())
+        visible = bool(self.metadata_creator.chk_titration_done.isChecked())
+        if hasattr(self.metadata_creator, "lbl_copper_workflow_status"):
+            self.metadata_creator.lbl_copper_workflow_status.setText(text)
+            self.metadata_creator.lbl_copper_workflow_status.setVisible(visible)
+        if hasattr(self.metadata_creator, "btn_export_report"):
+            self._refresh_report_button()
+        for widget in (
+            getattr(self, "copper_file_status_label", None),
+            getattr(self, "spectra_tab", None),
+            getattr(self, "analysis_tab", None),
+        ):
+            if widget is None:
+                continue
+            if hasattr(widget, "set_workflow_status_text"):
+                widget.set_workflow_status_text(text)
+            elif hasattr(widget, "setText"):
+                widget.setText(text)
+
+    def _is_report_ready(self) -> bool:
+        return bool(
+            self.metadata_creator.chk_titration_done.isChecked()
+            and getattr(self, "_map_ready", False)
+            and getattr(self, "_has_raman_files", False)
+        )
+
+    def _refresh_report_button(self) -> None:
+        button = self.metadata_creator.btn_export_report
+        visible = bool(self.metadata_creator.chk_titration_done.isChecked())
+        ready = self._is_report_ready()
+        button.setVisible(visible)
+        button.setEnabled(ready)
+        if ready:
+            button.setStyleSheet(
+                "background-color: #0057b8; color: white; font-weight: 700;"
+                " padding: 4px 12px;"
+            )
+            button.setToolTip("Rapport prêt : fiche + fichiers Raman + correspondance.")
+        else:
+            button.setStyleSheet(
+                "background-color: #adb5bd; color: white; font-weight: 700;"
+                " padding: 4px 12px;"
+            )
+            button.setToolTip(
+                "Rapport cuivre disponible après sélection des fichiers Raman "
+                "et validation de la correspondance."
+            )
 
     def _raman_session_for_save(self) -> dict:
         """État Raman léger à embarquer dans la fiche terrain."""
@@ -785,6 +895,14 @@ class MainWindow(QMainWindow):
             "analysis": analysis,
         }
 
+    def _raman_analysis_for_save(self) -> dict:
+        if not hasattr(self, "analysis_tab"):
+            return {}
+        try:
+            return self.analysis_tab.analysis_report_tables()
+        except Exception:
+            return {}
+
     def _restore_raman_session(self, session: object) -> None:
         if not isinstance(session, dict):
             return
@@ -795,6 +913,12 @@ class MainWindow(QMainWindow):
         missing = []
         if files and hasattr(self.file_picker, "restore_selected_files"):
             missing = self.file_picker.restore_selected_files(files)
+        found = max(0, len(files) - len(missing))
+        self._last_raman_restore = {
+            "present": bool(files),
+            "found": found,
+            "missing": len(missing),
+        }
 
         analysis_state = session.get("analysis")
         if hasattr(self, "analysis_tab") and isinstance(analysis_state, dict):
@@ -812,6 +936,214 @@ class MainWindow(QMainWindow):
                 "Les fichiers retrouvés ont été rechargés. Pour les autres, "
                 "utilisez « Choisir des fichiers Raman (.txt)… ».",
             )
+        self._refresh_global_workflow_status()
+
+    def _on_metadata_load_finished(self, summary: object) -> None:
+        data = summary if isinstance(summary, dict) else {}
+        if not data.get("loaded_raman_session"):
+            self._last_raman_restore = {
+                "present": False,
+                "found": len(self.file_picker.get_selected_files()),
+                "missing": 0,
+            }
+
+        raman = self._last_raman_restore
+        parts = [
+            "Fiche chargée",
+            "tableau volumes OK" if data.get("loaded_comp") else "tableau volumes absent",
+            "correspondance OK" if data.get("loaded_map") else "correspondance à valider",
+        ]
+        if raman.get("present"):
+            parts.append(f"{raman.get('found', 0)} fichiers Raman retrouvés")
+            parts.append(f"{raman.get('missing', 0)} chemin manquant"
+                         f"{'s' if raman.get('missing', 0) > 1 else ''}")
+        else:
+            parts.append("aucune session Raman enregistrée")
+
+        message = ", ".join(parts) + "."
+        self.statusBar().showMessage(message, 12000)
+        QMessageBox.information(self, "Reprise de fiche", message)
+        self._refresh_file_tab_status()
+        self._refresh_global_workflow_status()
+
+    def _report_tables(self) -> dict[str, object]:
+        mc = self.metadata_creator
+        tables = {}
+        try:
+            tables["Statut"] = self._status_dataframe()
+        except Exception:
+            pass
+        try:
+            tables["Mesures"] = mc._metadata_index_dataframe()[["Champ", "Valeur"]]
+        except Exception:
+            pass
+        if mc.df_comp is not None and hasattr(mc.df_comp, "empty") and not mc.df_comp.empty:
+            tables["Volumes"] = mc.df_comp.copy()
+        if mc.df_map is not None and hasattr(mc.df_map, "empty") and not mc.df_map.empty:
+            try:
+                tables["Correspondance"] = mc._df_map_with_current_header(mc.df_map)
+            except Exception:
+                tables["Correspondance"] = mc.df_map.copy()
+
+        files = self.file_picker.get_selected_files()
+        tables["Fichiers Raman"] = self._raman_files_dataframe(files)
+
+        analysis_df = None
+        if hasattr(self, "analysis_tab"):
+            try:
+                analysis_df = self.analysis_tab._results_dataframe(show_message=False)
+            except Exception:
+                analysis_df = None
+        if analysis_df is not None and not analysis_df.empty:
+            tables["Résultats analyse"] = analysis_df
+        return tables
+
+    def _status_dataframe(self):
+        import pandas as pd
+
+        return pd.DataFrame(
+            {
+                "État": self._workflow_state_labels(),
+            }
+        )
+
+    @staticmethod
+    def _raman_files_dataframe(files: list[str]):
+        import pandas as pd
+
+        rows = []
+        for path in files:
+            rows.append(
+                {
+                    "Fichier": os.path.basename(path),
+                    "Chemin": path,
+                    "Trouvé": "oui" if os.path.isfile(path) else "non",
+                }
+            )
+        return pd.DataFrame(rows, columns=["Fichier", "Chemin", "Trouvé"])
+
+    def _on_export_report_clicked(self) -> None:
+        default_path = os.path.join(os.path.expanduser("~"), "rapport_openlabeau.html")
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Exporter un rapport",
+            default_path,
+            "Rapport HTML (*.html);;Classeur Excel (*.xlsx)",
+        )
+        if not path:
+            return
+        selected_filter = selected_filter or ""
+        if not os.path.splitext(path)[1]:
+            path += ".xlsx" if "Excel" in selected_filter else ".html"
+
+        try:
+            if path.lower().endswith(".xlsx"):
+                self._export_report_xlsx(path)
+            else:
+                if not path.lower().endswith(".html"):
+                    path += ".html"
+                self._export_report_html(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(
+                self,
+                "Export impossible",
+                f"Impossible d'exporter le rapport :\n{exc}",
+            )
+            return
+
+        self.statusBar().showMessage(f"Rapport exporté : {path}", 12000)
+        QMessageBox.information(self, "Rapport exporté", f"Rapport enregistré :\n{path}")
+
+    def _export_report_xlsx(self, path: str) -> None:
+        import pandas as pd
+        from openpyxl.utils import get_column_letter
+
+        tables = self._report_tables()
+        with pd.ExcelWriter(path, engine="openpyxl") as writer:
+            for sheet, df in tables.items():
+                if df is None or not hasattr(df, "to_excel"):
+                    continue
+                safe_sheet = str(sheet)[:31]
+                df.to_excel(writer, sheet_name=safe_sheet, index=False)
+                worksheet = writer.sheets[safe_sheet]
+                for idx, column in enumerate(df.columns, start=1):
+                    values = [str(column)] + [str(v) for v in df[column].head(100)]
+                    width = min(max(len(v) for v in values) + 2, 60)
+                    worksheet.column_dimensions[get_column_letter(idx)].width = width
+
+            fig = getattr(getattr(self, "analysis_tab", None), "_last_fig", None)
+            if fig is not None:
+                note = pd.DataFrame(
+                    [
+                        {
+                            "Note": (
+                                "Le graphique interactif Plotly n'est pas intégré "
+                                "dans le rapport XLSX. Utilisez l'export HTML du "
+                                "rapport pour conserver le graphe."
+                            )
+                        }
+                    ]
+                )
+                note.to_excel(writer, sheet_name="Graphique", index=False)
+
+    def _export_report_html(self, path: str) -> None:
+        tables = self._report_tables()
+        title = "Rapport OpenLab'Eau"
+        sections = []
+        for name, df in tables.items():
+            if df is None or not hasattr(df, "to_html"):
+                continue
+            sections.append(
+                f"<section><h2>{html.escape(str(name))}</h2>"
+                f"{df.to_html(index=False, classes='tbl', border=0, escape=True)}"
+                "</section>"
+            )
+
+        fig = getattr(getattr(self, "analysis_tab", None), "_last_fig", None)
+        graph_html = ""
+        if fig is not None:
+            graph_html = (
+                "<section><h2>Graphique d'analyse</h2>"
+                + fig.to_html(include_plotlyjs=True, full_html=False)
+                + "</section>"
+            )
+
+        status_line = html.escape(" · ".join(self._workflow_state_labels()))
+        content = f"""<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{html.escape(title)}</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            color: #243b53; margin: 32px; background: #f5f7fa; }}
+    main {{ max-width: 1180px; margin: 0 auto; }}
+    h1 {{ color: #1f4e79; margin-bottom: 4px; }}
+    h2 {{ color: #2f75b5; margin-top: 28px; border-bottom: 1px solid #d0d7de;
+          padding-bottom: 4px; }}
+    .status {{ background: #ffffff; border: 1px solid #dde3ec; border-radius: 8px;
+               padding: 10px 12px; font-weight: 700; }}
+    section {{ background: #ffffff; border: 1px solid #dde3ec; border-radius: 8px;
+               padding: 16px 18px; margin: 16px 0; overflow-x: auto; }}
+    table.tbl {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
+    .tbl th, .tbl td {{ border: 1px solid #dde3ec; padding: 6px 8px; text-align: left; }}
+    .tbl th {{ background: #eaf2fb; color: #1f4e79; }}
+    .muted {{ color: #5a6b7b; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>{html.escape(title)}</h1>
+  <p class="muted">Export généré depuis OpenLab'Eau.</p>
+  <p class="status">{status_line}</p>
+  {''.join(sections)}
+  {graph_html}
+</main>
+</body>
+</html>
+"""
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
 
     def _refresh_copper_titration_tabs_visible(self, visible: bool) -> None:
         """Affiche les onglets utiles uniquement à la titration du cuivre."""
@@ -831,6 +1163,7 @@ class MainWindow(QMainWindow):
 
         self._refresh_workflow_tab_statuses()
         self._refresh_downstream_tabs_enabled()
+        self._refresh_global_workflow_status()
         self._last_tab_index = self.tabs.currentIndex()
 
     def _on_tab_changed(self, index: int) -> None:

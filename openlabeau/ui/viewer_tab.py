@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -119,9 +120,23 @@ class SpectraViewerTab(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.workflow_status_label = QLabel("", self)
+        self.workflow_status_label.setWordWrap(False)
+        self.workflow_status_label.setFixedHeight(28)
+        self.workflow_status_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Fixed
+        )
+        self.workflow_status_label.setStyleSheet(
+            "background: #ffffff; border: 1px solid #dde3ec; border-radius: 5px;"
+            "padding: 3px 8px; color: #243b53; font-weight: 650;"
+        )
+        layout.addWidget(self.workflow_status_label, 0)
         layout.addWidget(splitter)
 
         self._set_plot_done(False)
+
+    def set_workflow_status_text(self, text: str) -> None:
+        self.workflow_status_label.setText(text)
 
     @staticmethod
     def _axis_spin(value: float | None, suffix: str, parent) -> QDoubleSpinBox:

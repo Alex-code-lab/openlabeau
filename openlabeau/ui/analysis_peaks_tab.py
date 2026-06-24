@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QVBoxLayout,
@@ -281,6 +282,17 @@ class PeakAnalysisTab(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.workflow_status_label = QLabel("", self)
+        self.workflow_status_label.setWordWrap(False)
+        self.workflow_status_label.setFixedHeight(28)
+        self.workflow_status_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Fixed
+        )
+        self.workflow_status_label.setStyleSheet(
+            "background: #ffffff; border: 1px solid #dde3ec; border-radius: 5px;"
+            "padding: 3px 8px; color: #243b53; font-weight: 650;"
+        )
+        layout.addWidget(self.workflow_status_label, 0)
         layout.addWidget(splitter)
 
         self.store.changed.connect(self._on_store_changed)
@@ -288,6 +300,9 @@ class PeakAnalysisTab(QWidget):
             self.file_picker.selection_changed.connect(self._sync_from_picker)
         self._on_store_changed()
         self._sync_from_picker(silent=True)
+
+    def set_workflow_status_text(self, text: str) -> None:
+        self.workflow_status_label.setText(text)
 
     @staticmethod
     def _spin(parent, lo, hi, val, suffix, decimals, step):
@@ -756,10 +771,11 @@ class PeakAnalysisTab(QWidget):
         return x_eq
 
     # ------------------------------------------------------------------
-    def _results_dataframe(self):
+    def _results_dataframe(self, show_message: bool = True):
         if self._last_fig is None or not getattr(self, "_grp", None):
-            QMessageBox.information(
-                self, "Rien à exporter", "Tracez d'abord la hauteur des pics.")
+            if show_message:
+                QMessageBox.information(
+                    self, "Rien à exporter", "Tracez d'abord la hauteur des pics.")
             return None
         unit_label, factor = self._unit
         tubes = self._tube_by_path()
@@ -775,6 +791,64 @@ class PeakAnalysisTab(QWidget):
                 row[f"pic {c:.0f} cm⁻¹"] = None if np.isnan(v) else v
             rows.append(row)
         return pd.DataFrame(rows)
+
+    @staticmethod
+    def _peaks_summary_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+        """Synthèse par pic : valeur max et ligne où elle est observée."""
+        if df is None or df.empty:
+            return pd.DataFrame()
+        amount_col = next(
+            (c for c in df.columns if "titrant ajouté" in str(c)),
+            None,
+        )
+        peak_cols = [c for c in df.columns if str(c).startswith("pic ")]
+        rows = []
+        for col in peak_cols:
+            values = pd.to_numeric(df[col], errors="coerce")
+            if not values.notna().any():
+                rows.append(
+                    {
+                        "Pic": str(col).replace("pic ", ""),
+                        "Intensité max": None,
+                        "Fichier au max": "",
+                        "Tube au max": "",
+                        "Titrant au max": None,
+                    }
+                )
+                continue
+            idx = values.idxmax()
+            row = df.loc[idx]
+            rows.append(
+                {
+                    "Pic": str(col).replace("pic ", ""),
+                    "Intensité max": float(values.loc[idx]),
+                    "Fichier au max": row.get("Fichier", ""),
+                    "Tube au max": row.get("Tube", ""),
+                    "Titrant au max": row.get(amount_col, None)
+                    if amount_col is not None
+                    else None,
+                }
+            )
+        return pd.DataFrame(
+            rows,
+            columns=[
+                "Pic",
+                "Intensité max",
+                "Fichier au max",
+                "Tube au max",
+                "Titrant au max",
+            ],
+        )
+
+    def analysis_report_tables(self) -> dict[str, pd.DataFrame]:
+        """Tables prêtes à intégrer au classeur de fiche."""
+        results = self._results_dataframe(show_message=False)
+        if results is None or results.empty:
+            return {}
+        return {
+            "results": results,
+            "peaks": self._peaks_summary_dataframe(results),
+        }
 
     def export_results_csv(self):
         df = self._results_dataframe()

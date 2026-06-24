@@ -79,6 +79,9 @@ SHEET_TITRATION_VOLUMES = "Titration-volumes"
 SHEET_TITRATION_CORRESPONDENCE = "Titration-correspondance"
 SHEET_TITRATION_PROTOCOL_STATE = "Titration-EtatProtocole"
 SHEET_RAMAN_SESSION = "Session-Raman"
+SHEET_RAMAN_ANALYSIS_RESULTS = "Analyse-Raman"
+SHEET_RAMAN_ANALYSIS_PEAKS = "Pics-Raman"
+SHEET_RAMAN_ANALYSIS_GRAPH = "Graphique-Raman"
 SHEET_TITRATION_VOLUMES_ALIASES = (SHEET_TITRATION_VOLUMES, "Volumes")
 SHEET_TITRATION_CORRESPONDENCE_ALIASES = (
     SHEET_TITRATION_CORRESPONDENCE,
@@ -1989,6 +1992,7 @@ class MetadataCreatorWidget(QWidget):
     titration_visibility_changed = Signal(bool)
     metadata_saved_status_changed = Signal(bool)
     raman_session_loaded = Signal(object)
+    metadata_load_finished = Signal(object)
     # Émis quand l'état « correspondance spectres ↔ tubes prête » change (vert/rouge
     # du bouton Créer/éditer). Utilisé par MainWindow pour la couleur de l'onglet
     # « Fichiers Raman ».
@@ -2139,6 +2143,7 @@ class MetadataCreatorWidget(QWidget):
         self.map_dirty: bool = False
         self._metadata_dirty: bool = True
         self._raman_session_provider = None
+        self._raman_analysis_provider = None
         self._protocol_states: dict = {}  # état des cases du protocole de paillasse
         # Options d'affichage pour la correspondance spectres ↔ tubes
         self._map_include_control: bool = False
@@ -2665,6 +2670,17 @@ class MetadataCreatorWidget(QWidget):
         self.chk_titration_done = QCheckBox("Titration du cuivre", self)
         self.chk_titration_done.toggled.connect(self._on_titration_toggled)
         row_titration_measure.addWidget(self.chk_titration_done)
+        self.lbl_copper_workflow_status = QLabel("", self)
+        self.lbl_copper_workflow_status.setVisible(False)
+        self.lbl_copper_workflow_status.setStyleSheet(
+            "color: #243b53; font-weight: 650; padding: 3px 8px;"
+            "border: 1px solid #dde3ec; border-radius: 6px; background: #ffffff;"
+        )
+        row_titration_measure.addWidget(self.lbl_copper_workflow_status, 1)
+        self.btn_export_report = QPushButton("Exporter le rapport cuivre…", self)
+        self.btn_export_report.setVisible(False)
+        self.btn_export_report.setEnabled(False)
+        row_titration_measure.addWidget(self.btn_export_report)
         row_titration_measure.addStretch(1)
         measures_layout.addLayout(row_titration_measure)
 
@@ -2913,6 +2929,10 @@ class MetadataCreatorWidget(QWidget):
     def set_raman_session_provider(self, provider) -> None:
         """Définit la fonction appelée au moment de sauver la session Raman."""
         self._raman_session_provider = provider
+
+    def set_raman_analysis_provider(self, provider) -> None:
+        """Définit la fonction qui fournit les tables d'analyse Raman."""
+        self._raman_analysis_provider = provider
 
     def _setup_fillable_field_styles(self) -> None:
         self._fillable_fields = [
@@ -8231,6 +8251,88 @@ class MetadataCreatorWidget(QWidget):
             return data if isinstance(data, dict) else {}
         return {}
 
+    def _raman_analysis_tables(self) -> dict[str, pd.DataFrame]:
+        provider = getattr(self, "_raman_analysis_provider", None)
+        if provider is None:
+            return {}
+        try:
+            tables = provider()
+        except Exception:
+            return {}
+        return tables if isinstance(tables, dict) else {}
+
+    @staticmethod
+    def _write_raman_analysis_chart(workbook) -> None:
+        if SHEET_RAMAN_ANALYSIS_RESULTS not in workbook.sheetnames:
+            return
+        ws = workbook[SHEET_RAMAN_ANALYSIS_RESULTS]
+        if ws.max_row < 3 or ws.max_column < 4:
+            return
+        headers = [cell.value for cell in ws[1]]
+        x_col = next(
+            (
+                idx
+                for idx, value in enumerate(headers, start=1)
+                if "titrant ajouté" in str(value)
+            ),
+            None,
+        )
+        peak_cols = [
+            idx
+            for idx, value in enumerate(headers, start=1)
+            if str(value).startswith("pic ")
+        ]
+        if x_col is None or not peak_cols:
+            return
+
+        from openpyxl.chart import Reference, ScatterChart, Series
+        from openpyxl.styles import Font, PatternFill
+
+        graph = workbook.create_sheet(SHEET_RAMAN_ANALYSIS_GRAPH)
+        graph["A1"] = "Graphique des pics Raman étudiés"
+        graph["A2"] = (
+            "Graphique généré automatiquement depuis la feuille "
+            f"'{SHEET_RAMAN_ANALYSIS_RESULTS}'."
+        )
+        graph["A1"].font = Font(bold=True, size=14)
+
+        chart = ScatterChart()
+        chart.title = "Hauteur des pics vs titrant ajouté"
+        chart.x_axis.title = str(headers[x_col - 1])
+        chart.y_axis.title = "Hauteur du pic (a.u.)"
+        chart.legend.position = "r"
+        chart.height = 15
+        chart.width = 28
+
+        x_values = Reference(ws, min_col=x_col, min_row=2, max_row=ws.max_row)
+        for col in peak_cols:
+            y_values = Reference(ws, min_col=col, min_row=2, max_row=ws.max_row)
+            series = Series(y_values, x_values, title=str(headers[col - 1]))
+            chart.series.append(series)
+        graph.add_chart(chart, "A4")
+
+        if SHEET_RAMAN_ANALYSIS_PEAKS not in workbook.sheetnames:
+            return
+        peaks_ws = workbook[SHEET_RAMAN_ANALYSIS_PEAKS]
+        if peaks_ws.max_row < 2:
+            return
+
+        start_row = 34
+        graph.cell(start_row, 1, "Pics étudiés - valeurs maximales")
+        graph.cell(start_row, 1).font = Font(bold=True, size=12)
+        header_fill = PatternFill("solid", fgColor="D9EAD3")
+        for col_idx, cell in enumerate(peaks_ws[1], start=1):
+            target = graph.cell(start_row + 1, col_idx, cell.value)
+            target.font = Font(bold=True)
+            target.fill = header_fill
+            graph.column_dimensions[target.column_letter].width = 20
+        for row_idx, row in enumerate(
+            peaks_ws.iter_rows(min_row=2, values_only=True),
+            start=start_row + 2,
+        ):
+            for col_idx, value in enumerate(row, start=1):
+                graph.cell(row_idx, col_idx, value)
+
     @staticmethod
     def _ensure_extension(path: str, suffix: str) -> str:
         if path.lower().endswith(suffix):
@@ -8241,6 +8343,7 @@ class MetadataCreatorWidget(QWidget):
     def _save_metadata_xlsx(self, path: str) -> None:
         frames = self._metadata_frames_for_save()
         raman_session = self._raman_session_dataframe()
+        raman_analysis = self._raman_analysis_tables()
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
             frames[SHEET_TITRATION_VOLUMES].to_excel(
                 writer, sheet_name=SHEET_TITRATION_VOLUMES, index=False
@@ -8259,6 +8362,26 @@ class MetadataCreatorWidget(QWidget):
                     writer, sheet_name=SHEET_RAMAN_SESSION, index=False
                 )
                 writer.book[SHEET_RAMAN_SESSION].sheet_state = "hidden"
+            results = raman_analysis.get("results")
+            if (
+                results is not None
+                and isinstance(results, pd.DataFrame)
+                and not results.empty
+            ):
+                results.to_excel(
+                    writer, sheet_name=SHEET_RAMAN_ANALYSIS_RESULTS, index=False
+                )
+            peaks = raman_analysis.get("peaks")
+            if (
+                peaks is not None
+                and isinstance(peaks, pd.DataFrame)
+                and not peaks.empty
+            ):
+                peaks.to_excel(
+                    writer, sheet_name=SHEET_RAMAN_ANALYSIS_PEAKS, index=False
+                )
+            if SHEET_RAMAN_ANALYSIS_RESULTS in writer.book.sheetnames:
+                self._write_raman_analysis_chart(writer.book)
 
     def _on_save_metadata_clicked(self) -> None:
         """Enregistre la fiche terrain dans un classeur Excel."""
@@ -8313,6 +8436,7 @@ class MetadataCreatorWidget(QWidget):
             loaded_comp = False
             loaded_map = False
             loaded_metadata = False
+            loaded_raman_session = False
             summary_values = self._header_values_from_metadata_index_sheet(
                 xls
             ) or self._header_values_from_measure_summary_sheet(xls)
@@ -8459,6 +8583,7 @@ class MetadataCreatorWidget(QWidget):
                 session_df = pd.read_excel(xls, sheet_name=session_sheet)
                 session = self._raman_session_from_dataframe(session_df)
                 if session:
+                    loaded_raman_session = True
                     self.raman_session_loaded.emit(session)
             if loaded_comp and loaded_map:
                 self._mark_metadata_saved()
@@ -8468,6 +8593,15 @@ class MetadataCreatorWidget(QWidget):
             if loaded_metadata:
                 self._refresh_fillable_fields_style()
                 self._refresh_button_states()
+            self.metadata_load_finished.emit(
+                {
+                    "path": path,
+                    "loaded_comp": bool(loaded_comp),
+                    "loaded_map": bool(loaded_map),
+                    "loaded_metadata": bool(loaded_metadata),
+                    "loaded_raman_session": bool(loaded_raman_session),
+                }
+            )
         except Exception as e:
             QMessageBox.critical(
                 self,
