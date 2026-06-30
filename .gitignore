@@ -1,6 +1,7 @@
 # Environnements Python
 .venv/
 venv/
+venv_openlabo/
 env/
 
 # Caches Python

@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys; sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 #
 # Spec PyInstaller pour OpenLab'Eau — build Windows (mode dossier "onedir").
 #
@@ -62,8 +63,10 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
+    exclude_binaries=False,
     name="OpenLabEau",
     debug=False,
     bootloader_ignore_signals=False,
@@ -76,14 +79,4 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=["assets/openlabeau_icons/openlabeau.ico"],
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name="OpenLabEau",
 )
