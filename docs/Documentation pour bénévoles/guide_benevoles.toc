@@ -1,0 +1,21 @@
+\babel@toc {french}{}\relax 
+\contentsline {section}{\numberline {1}Avant de commencer}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}À quoi sert OpenLab'Eau}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Le code couleur, tout simple}{2}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Les onglets}{2}{subsection.1.3}%
+\contentsline {section}{\numberline {2}Remplir ma fiche terrain}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Ouvrir ou reprendre une fiche}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Le prélèvement}{4}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Le contexte}{5}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Les mesures faites}{6}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Enregistrer la fiche}{6}{subsection.2.5}%
+\contentsline {section}{\numberline {3}La titration du cuivre (mesure Raman)}{7}{section.3}%
+\contentsline {subsection}{\numberline {3.1}L'idée, en deux mots}{7}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Cocher la titration}{7}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Préparer les tubes}{7}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Étape : Fichiers Raman}{8}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Étape : Visualiseur}{9}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Étape : Analyse}{10}{subsection.3.6}%
+\contentsline {section}{\numberline {4}Le parcours en un coup d'œil}{13}{section.4}%
+\contentsline {section}{\numberline {5}Reprendre une fiche commencée}{14}{section.5}%
+\contentsline {section}{\numberline {6}Questions fréquentes}{14}{section.6}%

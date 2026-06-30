@@ -1,0 +1,1900 @@
+\documentclass[12pt, a4paper]{article}
+
+% ---------------------------------------------------------------------------
+% Encodage et langue
+% ---------------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+% ---------------------------------------------------------------------------
+% Mise en page
+% ---------------------------------------------------------------------------
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.8cm, right=2.8cm]{geometry}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage{setspace}
+\setstretch{1.1}
+
+% ---------------------------------------------------------------------------
+% Mathématiques
+% ---------------------------------------------------------------------------
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{bm}          % vecteurs en gras
+
+% ---------------------------------------------------------------------------
+% Tableaux et listes
+% ---------------------------------------------------------------------------
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{enumitem}
+\setlist[itemize]{itemsep=2pt}
+\setlist[enumerate]{itemsep=2pt}
+
+% ---------------------------------------------------------------------------
+% Code source
+% ---------------------------------------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{210,210,210}
+\definecolor{codecomment}{RGB}{100,100,100}
+\definecolor{codekeyword}{RGB}{0,80,180}
+\definecolor{codestring}{RGB}{160,30,30}
+\definecolor{codenumber}{RGB}{100,100,100}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codekeyword}\bfseries,
+  stringstyle=\color{codestring},
+  commentstyle=\color{codecomment}\itshape,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  extendedchars=true,
+  inputencoding=utf8,
+  literate=
+    {é}{{\'e}}1 {è}{{\`e}}1 {ê}{{\^e}}1 {à}{{\`a}}1 {â}{{\^a}}1
+    {î}{{\^i}}1 {ô}{{\^o}}1 {û}{{\^u}}1 {ù}{{\`u}}1 {ç}{{\c{c}}}1
+    {É}{{\'E}}1 {È}{{\`E}}1 {Â}{{\^A}}1 {Î}{{\^I}}1
+    {←}{{$\leftarrow$}}1 {→}{{$\rightarrow$}}1
+    {↑}{{$\uparrow$}}1 {↓}{{$\downarrow$}}1,
+}
+
+% ---------------------------------------------------------------------------
+% Encadrés
+% ---------------------------------------------------------------------------
+\usepackage{pifont}          % \ding{51} = ✓, \ding{114} = ☐
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+\newtcolorbox{remarque}[1][]{
+  colback=blue!5!white, colframe=blue!50!black,
+  fonttitle=\bfseries, title=Remarque, #1
+}
+\newtcolorbox{exemple}[1][]{
+  colback=green!5!white, colframe=green!50!black,
+  fonttitle=\bfseries, title=Exemple concret, #1
+}
+\newtcolorbox{attention}[1][]{
+  colback=orange!8!white, colframe=orange!70!black,
+  fonttitle=\bfseries, title=À retenir, #1
+}
+
+% ---------------------------------------------------------------------------
+% Hyperliens et PDF
+% ---------------------------------------------------------------------------
+\usepackage[hidelinks]{hyperref}
+\usepackage{cleveref}
+
+% ---------------------------------------------------------------------------
+% En-tête et pied de page
+% ---------------------------------------------------------------------------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Ramanalyze — Documentation complète}}
+\fancyhead[R]{\small\textit{Alexandre Souchaud}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------------------------------------------------------------------------
+% Commandes personnalisées
+% ---------------------------------------------------------------------------
+\newcommand{\X}{\mathbf{X}}
+\newcommand{\Xc}{\tilde{\mathbf{X}}}
+\newcommand{\C}{\mathbf{C}}
+\newcommand{\vv}{\mathbf{v}}
+\newcommand{\s}{\mathbf{s}}
+\newcommand{\xbar}{\bar{\mathbf{x}}}
+\newcommand{\cm}{cm$^{-1}$}
+\newcommand{\uM}{\,\mu{}M}
+\newcommand{\nM}{\,nM}
+
+% ---------------------------------------------------------------------------
+% Titre
+% ---------------------------------------------------------------------------
+\title{%
+  \textbf{\LARGE Ramanalyze}\\[0.5em]
+  \Large Application d'analyse de spectres Raman\\[0.8em]
+  \large Documentation technique et guide utilisateur complet
+}
+\author{Alexandre Souchaud \\ \small CitizenSers}
+\date{Mars 2026}
+
+% ===========================================================================
+\begin{document}
+% ===========================================================================
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+\textbf{Ramanalyze} est une application de bureau développée avec PySide6
+(Qt), pandas, NumPy, Plotly et scikit-learn. Elle permet d'assembler, de
+visualiser et d'analyser des spectres de spectroscopie Raman et SERS à partir
+de fichiers \texttt{.txt} bruts et de métadonnées au format Excel ou CSV.
+
+Ce document constitue la documentation complète du logiciel : guide
+d'utilisation pas à pas, description de l'architecture logicielle, et
+introduction mathématique détaillée à l'Analyse en Composantes Principales
+(PCA) telle qu'elle est implémentée dans l'onglet \textit{Exploration}. La
+section PCA est rédigée de façon pédagogique, avec des exemples numériques
+concrets, pour permettre à tout utilisateur de comprendre en profondeur ce que
+les composantes principales signifient physiquement et chimiquement.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ===========================================================================
+\section{Aperçu général}
+% ===========================================================================
+
+\textbf{Ramanalyze} guide l'utilisateur à travers les étapes suivantes :
+
+\begin{enumerate}
+  \item \textbf{Sélection} des fichiers spectres \texttt{.txt}.
+  \item \textbf{Association} avec un fichier de métadonnées (Excel ou CSV).
+  \item \textbf{Assemblage} et correction de ligne de base (\textit{baseline})
+        par l'algorithme \textit{modpoly} de la bibliothèque \texttt{pybaselines}.
+  \item \textbf{Visualisation} interactive des spectres corrigés (Plotly).
+  \item \textbf{Analyse} des pics : intensités maximales locales et ratios entre
+        pics.
+  \item \textbf{Exploration multivariée} par Analyse en Composantes Principales
+        (PCA corrélée et PCA libre).
+  \item \textbf{Export} des résultats en Excel ou CSV.
+\end{enumerate}
+
+% ===========================================================================
+\section{Fonctionnalités principales}
+% ===========================================================================
+
+\begin{itemize}
+  \item Sélecteur de fichiers \texttt{.txt} avec navigation arborescente,
+        ajout/retrait, liste des éléments sélectionnés.
+  \item Lecture de métadonnées en \textbf{Excel} (\texttt{.xlsx/.xls}) et
+        \textbf{CSV} (séparateur détecté automatiquement parmi \texttt{,},
+        \texttt{;}, tabulation).
+  \item Correction de ligne de base (algorithme \textit{modpoly}, ordre~5 par
+        défaut) via \texttt{pybaselines}.
+  \item Assemblage des données (spectres + métadonnées) avec prévisualisation
+        immédiate.
+  \item Sauvegarde du fichier combiné au choix en CSV ou Excel.
+  \item Tracé interactif Plotly : zoom, panoramique, légende cliquable,
+        export PNG.
+  \item Analyse des pics : intensité maximale dans une fenêtre
+        $[\nu_0 \pm \Delta\nu]$, ratios automatiques pour toutes les paires
+        de pics, graphique interactif des ratios en fonction d'une variable
+        de métadonnées.
+  \item Export Excel des résultats (feuilles \texttt{intensites} et
+        \texttt{ratios}).
+  \item PCA corrélée sur les intensités aux pics sélectionnés.
+  \item PCA libre sur les spectres complets (matrice normalisée), avec
+        sous-onglets \textit{Scores}, \textit{Loadings}, \textit{Reconstruction}.
+  \item Scatter matrix (matrice de corrélation entre les pics).
+  \item Génération de volumes de titrant selon une distribution gaussienne
+        (outil \textit{GaussianVolumesDialog}).
+\end{itemize}
+
+% ===========================================================================
+\section{Structure du dépôt}
+% ===========================================================================
+
+\begin{lstlisting}
+spectroscopie_raman/
+|-- main.py               # Point d'entree Qt : fenetre principale, onglets
+|-- file_picker.py        # Onglet Fichiers : navigation, selection .txt
+|-- metadata_creator.py   # Onglet Metadonnees : UI Qt (volumes, correspondance)
+|-- metadata_model.py     # Couche donnees pure (sans Qt) : calculs, fusion
+|-- spectra_plot.py       # Onglet Spectres : trace Plotly, export haute resolution
+|-- analysis_tab.py       # Onglet Analyse : pics, ratios, fit sigmoide, export
+|-- peak_selector.py      # Onglet Exploration : PCA correlee + PCA libre
+|-- data_processing.py    # Chargement .txt, baseline, assemblage
+|-- plotly_downloads.py   # Utilitaires export graphique (JS Plotly, printToPdf)
+\end{lstlisting}
+
+Le fichier \texttt{metadata\_model.py} est une \textbf{couche données pure} :
+il ne contient aucun import Qt et peut être importé, testé et utilisé
+indépendamment de l'interface graphique.
+
+% ===========================================================================
+\section{Installation}
+% ===========================================================================
+
+\subsection{Prérequis}
+
+\begin{itemize}
+  \item Python 3.9 ou supérieur.
+  \item Système d'exploitation : macOS, Linux ou Windows.
+\end{itemize}
+
+\subsection{Environnement virtuel et dépendances}
+
+\begin{lstlisting}[language=bash]
+# Creer un environnement virtuel (recommande)
+python -m venv .venv
+source .venv/bin/activate      # macOS / Linux
+# .venv\Scripts\activate       # Windows (PowerShell ou CMD)
+
+# Installer les dependances
+pip install PySide6 pandas numpy plotly pybaselines openpyxl scikit-learn scipy
+\end{lstlisting}
+
+\begin{remarque}
+\texttt{openpyxl} est nécessaire pour lire et écrire les fichiers Excel.
+\texttt{PySide6} peut nécessiter des composants Qt WebEngine supplémentaires
+selon le système d'exploitation.
+\end{remarque}
+
+\subsection{Lancement}
+
+\begin{lstlisting}[language=bash]
+python main.py
+\end{lstlisting}
+
+Une fenêtre \textbf{Ramanalyze} s'ouvre avec les onglets : \textit{Fichiers},
+\textit{Métadonnées}, \textit{Spectres}, \textit{Analyse}, \textit{Exploration}.
+
+% ===========================================================================
+\section{Guide d'utilisation (pas à pas)}
+% ===========================================================================
+
+\subsection{Onglet Fichiers}
+
+\begin{enumerate}
+  \item Naviguez dans l'arborescence de fichiers (double-clic pour entrer dans
+        un dossier).
+  \item Sélectionnez un ou plusieurs \textbf{fichiers \texttt{.txt}} de
+        spectroscopie Raman.
+  \item Cliquez \textbf{Ajouter la sélection} : les fichiers sont placés dans
+        la liste de droite.
+  \item Utilisez \textbf{Retirer} pour enlever un fichier individuel, ou
+        \textbf{Vider la liste} pour recommencer.
+  \item Le compteur en bas indique le nombre de fichiers prêts pour l'analyse.
+\end{enumerate}
+
+\begin{remarque}
+Seuls les fichiers \texttt{.txt} sont listés ; les dossiers restent navigables
+mais n'apparaissent pas dans la sélection finale.
+\end{remarque}
+
+\subsection{Onglet Métadonnées}
+
+\subsubsection{Saisie des volumes}
+
+Remplissez le \textbf{tableau des volumes} (réactifs $\times$ tubes) :
+chaque ligne est un réactif (Solution A, B, C\,\ldots), chaque colonne est
+un tube expérimental. Les valeurs sont en \textmu{}L.
+
+\paragraph{Gestion des colonnes (tubes).}
+Un clic sur l'en-tête d'une colonne la sélectionne visuellement. Un clic
+droit sur cet en-tête ouvre un menu contextuel proposant de \textbf{dupliquer}
+ou de \textbf{supprimer} le tube correspondant. Des boutons dédiés dans la
+barre d'outils permettent également d'ajouter un tube vierge en fin de
+tableau.
+
+Pour générer automatiquement des volumes de titrant distribués autour de
+l'équivalence chimique, utilisez le bouton \textbf{Générer volumes (gaussien)}.
+Cf.\ section~\ref{sec:gauss} pour le détail mathématique de cet outil.
+
+\subsubsection{Correspondance spectres $\leftrightarrow$ tubes}
+
+Le tableau de correspondance associe chaque fichier spectre à un tube
+expérimental. Il peut être rempli manuellement ou généré automatiquement.
+
+\subsubsection{Assemblage}
+
+\begin{enumerate}
+  \item Cliquez \textbf{Assembler} :
+    \begin{itemize}
+      \item lecture de chaque fichier \texttt{.txt},
+      \item détection et suppression de l'en-tête (\texttt{Pixel;}),
+      \item conversion numérique, tri sur le Raman Shift,
+      \item correction de ligne de base (modpoly, ordre~5),
+      \item fusion avec les métadonnées sur la clé \texttt{Spectrum name}.
+    \end{itemize}
+  \item Vérifiez le message de succès (nombre de lignes et colonnes du fichier
+        combiné).
+  \item Cliquez \textbf{Enregistrer} pour sauvegarder en CSV ou Excel.
+\end{enumerate}
+
+\begin{remarque}
+Le dernier chemin d'enregistrement est mémorisé pour accélérer les
+sauvegardes suivantes.
+\end{remarque}
+
+\subsubsection{Feuille de protocole de paillasse}
+\label{subsec:protocole}
+
+Le bouton \textbf{Feuille de protocole\,\ldots} (onglet \textit{Métadonnées})
+ouvre un dialogue interactif destiné à \textbf{tracer les opérations de pipetage}
+sur la paillasse. Il affiche le tableau \texttt{df\_comp} sous forme d'une grille
+où chaque ligne est un réactif et chaque colonne un tube expérimental.
+
+\paragraph{Structure du tableau.}
+Pour chaque tube, trois sous-colonnes sont disponibles :
+
+\begin{itemize}
+  \item \textbf{Volume (µL)} — lecture seule ; rappelle la quantité à pipeter.
+  \item \textbf{Coordinateur \ding{114}} — case validée par le coordinateur.
+  \item \textbf{Opérateur \ding{114}} — case validée par l'opérateur.
+\end{itemize}
+
+Une colonne \textbf{Vérification solution} permet en outre de confirmer
+l'identité du flacon avant tout pipetage.
+
+\paragraph{Mode guidé.}
+En mode guidé, seule la cellule de l'étape courante est active ;
+toutes les autres sont grisées et désactivées.
+La séquence automatique suit l'ordre :
+
+\begin{enumerate}
+  \item Vérification de la solution du réactif courant.
+  \item Tube~1 : confirmation du volume + case Coordinateur + case Opérateur.
+  \item Tube~2, Tube~3, \ldots jusqu'au dernier tube.
+  \item Passage au réactif suivant (Vérif → Tube~1 → Tube~2 → \ldots).
+\end{enumerate}
+
+Un libellé de statut vert indique l'étape en cours :
+\texttt{→ Vérifier la solution : Solution~A} ou \texttt{→ Solution~A · Tube~1}.
+
+\paragraph{Workflow coordinateur / opérateur.}
+Le coordinateur coche sa case en premier (tube préparé), puis l'opérateur
+valide après vérification indépendante.
+Les boutons \textbf{Tout cocher — Coord.} et \textbf{Tout cocher — Opér.}
+permettent de valider toutes les cases d'un rôle en un clic ;
+\textbf{Tout décocher} remet tout à zéro.
+
+\paragraph{Export : fichier unifié (4 feuilles).}
+Le bouton \textbf{Exporter Excel\,\ldots} génère un fichier \texttt{.xlsx}
+contenant les quatre feuilles suivantes :
+
+\begin{itemize}
+  \item \texttt{Protocole} — feuille visuelle mise en forme (en-têtes colorés,
+        texte pivoté, symboles \ding{51}/\ding{114}).
+  \item \texttt{Volumes} — données brutes de \texttt{df\_comp}.
+  \item \texttt{Correspondance} — données brutes de \texttt{df\_map}.
+  \item \texttt{EtatProtocole} — état de chaque case
+        (\texttt{type}, \texttt{r\_idx}, \texttt{t\_idx}, \texttt{checked}).
+\end{itemize}
+
+\paragraph{Persistance et rechargement.}
+\begin{itemize}
+  \item Fermeture du dialogue : l'état des cases est conservé en mémoire.
+  \item \textbf{Enregistrer les métadonnées\,\ldots} : la feuille
+        \texttt{EtatProtocole} est incluse automatiquement dans le fichier
+        sauvegardé.
+  \item \textbf{Charger des métadonnées\,\ldots} : si le fichier contient
+        une feuille \texttt{EtatProtocole}, toutes les cases reprennent
+        exactement l'état sauvegardé.
+\end{itemize}
+
+\begin{remarque}
+Récapitulatif du flux de travail en paillasse :
+\begin{enumerate}
+  \item Ouvrir \textbf{Feuille de protocole\,\ldots}.
+  \item Suivre le mode guidé : Vérif → Coord → Opér, tube par tube.
+  \item Cliquer \textbf{Exporter Excel\,\ldots} pour archiver.
+  \item Recharger le fichier à tout moment via
+        \textbf{Charger des métadonnées\,\ldots} pour reprendre où vous en
+        étiez.
+\end{enumerate}
+\end{remarque}
+
+\subsection{Onglet Spectres}
+
+\begin{itemize}
+  \item Charge automatiquement le fichier combiné produit à l'étape précédente.
+  \item Filtre sur les fichiers sélectionnés dans l'onglet \textit{Fichiers}
+        (colonne \texttt{file}).
+  \item La légende utilise \texttt{Sample description} si disponible, sinon le
+        nom de fichier.
+  \item Cliquez \textbf{Tracer avec baseline} pour générer la figure Plotly
+        interactive (zoom, pan, légende cliquable).
+\end{itemize}
+
+\paragraph{Export du graphique.}
+Le bouton \textbf{Exporter le graphique\,\ldots} ouvre un dialogue proposant :
+\begin{itemize}
+  \item \textbf{Format} : PNG (haute résolution, facteur $\times 2$), SVG
+        (vectoriel) ou PDF (moteur Qt).
+  \item \textbf{Taille de sortie} (PNG et SVG) : préréglages A4 paysage, A4
+        portrait, A3 paysage, A3 portrait, écran large (1920$\times$1080),
+        carré HD (1400$\times$1400), ou dimensions personnalisées en pixels.
+\end{itemize}
+
+L'export PNG et SVG utilise l'API JavaScript de Plotly directement depuis le
+moteur de rendu de l'application (\texttt{Plotly.toImage} via
+\texttt{QWebEnginePage.runJavaScript}). Le résultat est ainsi
+\textbf{pixel-perfect} et identique à ce qui est affiché à l'écran.
+L'export PDF utilise \texttt{QWebEnginePage.printToPdf} en format A4 paysage.
+
+\subsection{Onglet Analyse}
+
+\begin{enumerate}
+  \item Rechargez le fichier combiné si nécessaire.
+  \item Choisissez un \textbf{jeu de pics} :
+    \begin{itemize}
+      \item \textbf{532~nm — paires pré-enregistrées} : jeu de paires de pics
+            optimisé pour le laser 532~nm.
+      \item \textbf{785~nm} : pics à 412, 444, 471, 547, 1561~\cm.
+      \item \textbf{Personnalisé} : saisissez librement les Raman Shifts en
+            \cm, séparés par des virgules.
+    \end{itemize}
+  \item Réglez la \textbf{tolérance} $\Delta\nu$ (défaut~: 5{,}00~\cm).
+  \item Cliquez \textbf{Analyser les pics} :
+    \begin{itemize}
+      \item recherche de l'intensité maximale dans $[\nu_0 - \Delta\nu,\,
+            \nu_0 + \Delta\nu]$ pour chaque spectre et chaque pic,
+      \item calcul de tous les ratios $I_i / I_j$ pour chaque paire de pics
+            $(i, j)$,
+      \item jointure avec les métadonnées et calcul de la quantité de titrant
+            $n(\text{titrant})$ en mol,
+      \item affichage d'un tableau triable et d'un graphique interactif des
+            ratios en fonction de la quantité de titrant.
+    \end{itemize}
+  \item \textbf{Exporter résultats (Excel)\,\ldots} pour sauvegarder :
+    \begin{itemize}
+      \item feuille \texttt{intensites} : intensité maximale par pic et par
+            spectre,
+      \item feuille \texttt{ratios} : tous les ratios en format long.
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Fit sigmoïde et point d'équivalence.}
+Pour chaque ratio calculé, il est possible d'ajuster une fonction sigmoïde
+afin de localiser le point d'équivalence de la titration :
+\begin{enumerate}
+  \item Sélectionnez le ratio dans la liste \textbf{Ratio à ajuster}.
+  \item Cliquez \textbf{Ajuster par sigmoïde} : le fit est réalisé par
+        moindres carrés (\texttt{scipy.optimize.curve\_fit}) et la courbe
+        ajustée est superposée au graphique.
+  \item Cliquez \textbf{Afficher l'équivalence} pour annoter le graphique
+        avec la valeur du point d'équivalence $x_\text{eq}$.
+\end{enumerate}
+
+\paragraph{Export du graphique (Analyse).}
+Le bouton \textbf{Enregistrer le graphique} propose les mêmes options que
+l'onglet Spectres : PNG haute résolution, SVG vectoriel ou PDF, avec choix
+de la taille de sortie parmi les préréglages A4, A3, écran large, ou en
+dimensions personnalisées.
+
+\subsection{Onglet Exploration (PCA)}
+
+L'onglet \textbf{Exploration} regroupe la sélection de pics et deux modes de
+PCA, accessibles via des sous-onglets.
+
+\subsubsection{Sous-onglets disponibles}
+
+\begin{table}[h!]
+  \centering
+  \caption{Sous-onglets de l'onglet Exploration.}
+  \label{tab:subtabs}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{Sous-onglet} & \textbf{Description} \\
+    \midrule
+    Spectres normalisés  & Superposition des spectres après normalisation
+                           par leur norme vectorielle \\
+    Spectres superposés  & Superposition brute (sans normalisation) \\
+    PCA corrélée         & PCA calculée sur la matrice des intensités aux pics
+                           sélectionnés uniquement \\
+    PCA --- Scores       & Position de chaque spectre dans l'espace défini par
+                           les composantes de la PCA libre \\
+    PCA --- Loadings     & Poids de chaque nombre d'onde pour chaque composante
+                           (affiché comme un spectre) \\
+    PCA --- Reconstruction & Reconstruction d'un spectre à partir de $N$
+                           composantes seulement \\
+    Scatter matrix       & Matrice de nuages de points entre toutes les paires
+                           de pics (corrélations visuelles) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsubsection{Paramètres}
+
+\begin{itemize}
+  \item \textbf{Composantes PCA corrélée} : nombre de composantes principales
+        pour la PCA sur les intensités aux pics.
+  \item \textbf{Composantes PCA libre} : nombre de composantes pour la PCA sur
+        les spectres complets (2 à 15).
+  \item \textbf{Colorier par} : variable de métadonnées utilisée pour colorer
+        les points dans les graphiques de scores, spectres\,\ldots
+\end{itemize}
+
+\subsubsection{Workflow typique}
+
+\begin{enumerate}
+  \item Rechargez les données.
+  \item Définissez vos pics cibles et la tolérance.
+  \item Lancez l'analyse.
+  \item Consultez le sous-onglet \textbf{PCA --- Scores} (colorié par
+        concentration) : les spectres se séparent-ils selon votre variable
+        d'intérêt ?
+  \item Consultez \textbf{PCA --- Loadings} : à quels nombres d'onde les axes
+        sont-ils sensibles ?
+  \item Utilisez \textbf{PCA --- Reconstruction} avec $N = 1$, $N = 2$,
+        $N = 3$\,\ldots\ pour visualiser ce que chaque composante capture
+        réellement.
+\end{enumerate}
+
+% ===========================================================================
+\section{Comprendre la PCA en spectroscopie Raman}
+\label{sec:pca}
+% ===========================================================================
+
+\subsection{Motivation : pourquoi la PCA ?}
+
+Un spectre Raman est un vecteur de $p \approx 1\,000$ points, chaque
+composante étant l'intensité à un nombre d'onde donné. Si l'on dispose de
+$n = 15$ spectres, chaque spectre est un \textbf{point dans un espace à
+$p = 1\,000$ dimensions}.
+
+\medskip
+
+Ce que l'on cherche à comprendre expérimentalement :
+
+\begin{itemize}
+  \item Les spectres se ressemblent-ils selon la concentration en titrant ?
+  \item Y a-t-il des groupes distincts d'échantillons ?
+  \item Quelles bandes Raman varient le plus entre les tubes ?
+\end{itemize}
+
+Répondre à ces questions directement dans un espace à 1\,000 dimensions est
+impossible. La \textbf{PCA} (Analyse en Composantes Principales) résout ce
+problème en cherchant les quelques \textbf{directions} dans cet espace qui
+capturent le plus de variabilité entre spectres, puis en projetant tous les
+spectres sur ces directions pour obtenir une représentation en 2D ou 3D
+facilement visualisable.
+
+\begin{attention}
+La PCA ne \og perd\fg{} pas l'information arbitrairement : elle choisit les
+directions qui \textbf{maximisent la variance conservée}. Les premières
+composantes capturent donc l'essentiel de la variabilité réelle.
+\end{attention}
+
+\subsection{Calcul pas à pas : de la matrice de spectres aux composantes}
+
+\subsubsection{Étape 1 --- Construction de la matrice de données}
+
+On empile les $n$ spectres en lignes pour former une matrice $\X$ de taille
+$n \times p$ :
+
+\[
+\X =
+\begin{pmatrix}
+  x_{1,1} & x_{1,2} & \cdots & x_{1,p} \\
+  x_{2,1} & x_{2,2} & \cdots & x_{2,p} \\
+  \vdots  & \vdots  & \ddots & \vdots  \\
+  x_{n,1} & x_{n,2} & \cdots & x_{n,p}
+\end{pmatrix}
+\]
+
+où $x_{i,j}$ est l'intensité du spectre $i$ au nombre d'onde $\nu_j$
+(après correction de baseline).
+
+\begin{exemple}
+Avec $n = 15$ spectres et $p = 1\,000$ nombres d'onde :
+
+\medskip
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+            & $\nu_1$ & $\nu_2$ & $\cdots$ & $\nu_{1000}$ \\
+\midrule
+Spectre 1   & 120     & 45      & $\cdots$ & 8   \\
+Spectre 2   & 118     & 47      & $\cdots$ & 9   \\
+$\vdots$    & $\vdots$& $\vdots$& $\ddots$ & $\vdots$ \\
+Spectre 15  & 130     & 41      & $\cdots$ & 7   \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{exemple}
+
+\subsubsection{Étape 2 --- Centrage de la matrice}
+
+Avant tout calcul, on \textbf{centre} la matrice : pour chaque nombre d'onde
+$j$, on soustrait la moyenne des $n$ spectres à cette fréquence.
+
+\[
+\tilde{x}_{i,j} = x_{i,j} - \bar{x}_j
+\quad \text{où} \quad
+\bar{x}_j = \frac{1}{n} \sum_{k=1}^{n} x_{k,j}
+\]
+
+Après centrage, chaque colonne de $\Xc$ a une \textbf{moyenne nulle}. On
+travaille désormais sur les \textbf{écarts} par rapport au spectre moyen
+$\xbar = (\bar{x}_1, \ldots, \bar{x}_p)$ : c'est ce qui varie d'un spectre
+à l'autre qui est informatif, pas la valeur absolue de l'intensité.
+
+\begin{remarque}
+Le centrage est une étape \textbf{obligatoire} en PCA. Sans centrage, la
+première composante principale serait simplement la direction du vecteur
+moyen $\xbar$ (la valeur absolue la plus grande), ce qui n'a pas de sens
+physique.
+\end{remarque}
+
+\subsubsection{Étape 3 --- Matrice de covariance}
+
+On calcule la \textbf{matrice de covariance} $\C$ de taille $p \times p$ :
+
+\[
+\C = \frac{1}{n-1}\, \Xc^\top \Xc
+\]
+
+Chaque élément $C_{i,j}$ est la \textbf{covariance} entre les intensités aux
+nombres d'onde $\nu_i$ et $\nu_j$ :
+
+\[
+C_{i,j} = \frac{1}{n-1} \sum_{k=1}^{n} \tilde{x}_{k,i}\,\tilde{x}_{k,j}
+\]
+
+Interprétation physique :
+
+\begin{itemize}
+  \item $C_{i,j} > 0$ : quand l'intensité à $\nu_i$ est élevée (au-dessus de
+        sa moyenne), celle à $\nu_j$ l'est aussi. Les deux bandes Raman
+        \textbf{varient de concert} — elles sont probablement liées au même
+        phénomène chimique.
+  \item $C_{i,j} < 0$ : les deux bandes varient en sens opposé.
+  \item $C_{i,j} \approx 0$ : les bandes sont indépendantes.
+  \item $C_{i,i} = \text{Var}(\nu_i)$ : variance de l'intensité à $\nu_i$
+        sur l'ensemble des spectres.
+\end{itemize}
+
+La matrice $\C$ encode ainsi \textbf{toutes les corrélations entre bandes
+Raman} dans un seul objet mathématique de taille $1\,000 \times 1\,000$.
+
+\subsubsection{Étape 4 --- Décomposition en valeurs propres}
+
+On résout le \textbf{problème aux valeurs propres} de $\C$ :
+
+\[
+\C\,\vv_k = \lambda_k\,\vv_k
+\]
+
+Cette équation admet $p$ solutions (paires $(\lambda_k, \vv_k)$) :
+
+\begin{itemize}
+  \item $\lambda_k \geq 0$ est la \textbf{valeur propre}, proportionnelle à la
+        variance expliquée par la $k$-ième composante.
+  \item $\vv_k \in \mathbb{R}^p$ est le \textbf{vecteur propre} associé,
+        appelé \textbf{loading} de la composante PC$_k$.
+        Il est de norme unitaire ($\|\vv_k\| = 1$) et a exactement la même
+        longueur que les spectres (un coefficient par nombre d'onde).
+\end{itemize}
+
+On trie les paires par valeur propre décroissante :
+$\lambda_1 \geq \lambda_2 \geq \cdots \geq \lambda_p \geq 0$.
+Le plus grand $\lambda_1$ donne \textbf{PC1}, le second $\lambda_2$ donne
+\textbf{PC2}, etc.
+
+La \textbf{fraction de variance expliquée} par la composante $k$ est :
+
+\[
+\text{VE}_k = \frac{\lambda_k}{\displaystyle\sum_{j=1}^{p} \lambda_j}
+\]
+
+et la variance expliquée \textbf{cumulée} par les $N$ premières composantes :
+
+\[
+\text{VE}_{\text{cum}}(N) = \frac{\displaystyle\sum_{k=1}^{N} \lambda_k}
+                                  {\displaystyle\sum_{j=1}^{p} \lambda_j}
+\]
+
+\begin{exemple}
+Si $\text{VE}_1 = 72\,\%$, $\text{VE}_2 = 15\,\%$, $\text{VE}_3 = 6\,\%$,
+alors les 3 premières composantes expliquent $72 + 15 + 6 = 93\,\%$ de toute
+la variabilité entre spectres. Les 997 composantes restantes partagent les
+7\,\% restants (principalement du bruit).
+\end{exemple}
+
+\begin{remarque}[title=Pourquoi les valeurs propres de $\C$ ?]
+La matrice $\C$ est symétrique positive. Ses vecteurs propres forment une
+\textbf{base orthonormée} de $\mathbb{R}^p$ : deux composantes principales
+distinctes sont toujours perpendiculaires, ce qui garantit qu'elles capturent
+des informations \emph{indépendantes}. C'est une propriété fondamentale de la
+PCA : les composantes ne se répètent pas entre elles.
+\end{remarque}
+
+\subsubsection{Étape 5 --- Calcul des scores}
+
+Le \textbf{score} du spectre $i$ sur la composante PC$_k$ est le
+\textbf{produit scalaire} entre le spectre centré et le loading :
+
+\[
+s_{i,k} = \tilde{\mathbf{x}}_i \cdot \vv_k
+         = \sum_{j=1}^{p} \tilde{x}_{i,j}\, v_{k,j}
+\]
+
+Intuition : on \og projette\fg{} le spectre sur la direction $\vv_k$.
+Le résultat est \textbf{un seul nombre} par spectre et par composante.
+
+\medskip
+
+La matrice des scores $\mathbf{S}$ de taille $n \times K$ (avec $K$
+composantes retenues) s'écrit :
+
+\[
+\mathbf{S} = \Xc \cdot \mathbf{V}
+\]
+
+où $\mathbf{V} = [\vv_1 \mid \vv_2 \mid \cdots \mid \vv_K]$ est la matrice
+des loadings ($p \times K$).
+
+\begin{exemple}
+Avec 15 spectres et 2 composantes retenues :
+
+\medskip
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+             & Score PC1 & Score PC2 \\
+\midrule
+Spectre 1    & $-3{,}2$  & $0{,}8$   \\
+Spectre 2    & $-2{,}8$  & $1{,}1$   \\
+Spectre 3    & $-1{,}1$  & $0{,}3$   \\
+$\vdots$     & $\vdots$  & $\vdots$  \\
+Spectre 15   & $+4{,}1$  & $-0{,}5$  \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+On peut maintenant tracer ces 15 spectres dans le plan (PC1, PC2) — en 2
+dimensions au lieu de 1\,000.
+\end{exemple}
+
+\subsection{Interprétation géométrique}
+
+Imaginons que chaque spectre soit un \textbf{point dans l'espace à $p$
+dimensions}. Les $n$ spectres forment un \textbf{nuage de points} dans cet
+espace.
+
+Ce nuage n'est pas sphérique : il est allongé dans certaines directions
+(là où les spectres varient beaucoup entre eux) et aplati dans d'autres
+(là où les spectres se ressemblent).
+
+\begin{itemize}
+  \item \textbf{PC1} = l'axe selon lequel le nuage est le \emph{plus allongé}
+        (variance maximale).
+  \item \textbf{PC2} = l'axe perpendiculaire à PC1 selon lequel le nuage est
+        le \emph{deuxième plus allongé}.
+  \item \textbf{PC3} = perpendiculaire aux deux précédents, troisième variance
+        maximale.
+  \item \ldots
+\end{itemize}
+
+La PCA trouve la meilleure \og orientation\fg{} pour regarder ce nuage depuis
+un espace de faible dimension.
+
+\medskip
+
+\begin{center}
+\begin{tabular}{c}
+\ttfamily
+\begin{tabular}{l}
+\hspace{2.5cm}PC2\\
+\hspace{2.2cm}$\uparrow$\hspace{0.3cm} $\cdot$\ $\cdot$\ (faible conc.)\\
+\hspace{2.2cm}$|$\hspace{0.3cm} $\cdot$\ $\cdot$\ $\cdot$\\
+\hspace{2.2cm}$|$\hspace{0.2cm} $\cdot$\ $\cdot$\ $\cdot$\ $\cdot$\\
+\hspace{2.2cm}$|$\ $\cdot$\ $\cdot$\ $\cdot$\\
+\hspace{2.2cm}$+$-------------------$\rightarrow$ PC1\hspace{0.3cm}(forte conc.)\\
+\end{tabular}
+\end{tabular}
+\end{center}
+
+Chaque point représente un spectre. Sa position sur l'axe PC1 mesure sa
+\og ressemblance\fg{} avec le pattern du loading PC1.
+
+\subsection{Ce que signifient PC1, PC2, PC3\,\ldots}
+
+\subsubsection{PC1 : la plus grande source de variabilité}
+
+PC1 capture la direction dans laquelle les spectres varient \textbf{le plus}.
+C'est la composante qui explique la plus grande fraction de la variance totale.
+
+\medskip
+
+\textbf{Important :} PC1 n'est pas nécessairement la plus chimiquement
+intéressante. Elle capturera simplement la plus grande source de variabilité,
+qu'il s'agisse :
+\begin{itemize}
+  \item d'une \textbf{variation de fluorescence de fond} (ligne de base) entre
+        spectres — artefact instrumental courant,
+  \item d'une \textbf{variation de puissance laser} entre sessions de mesure,
+  \item ou de l'effet chimique recherché (concentration, pH, etc.) si c'est
+        bien lui qui domine la variabilité.
+\end{itemize}
+
+\subsubsection{PC2 : la deuxième source de variabilité}
+
+Perpendiculaire à PC1 (au sens du produit scalaire, donc mathématiquement
+indépendante), PC2 capture la \textbf{deuxième source de variabilité} après
+que PC1 a \og absorbé\fg{} la plus grande.
+
+\begin{attention}
+Dans une expérience SERS de titration bien menée, si la fluorescence de fond
+constitue la principale source de variabilité, \textbf{PC1 capturera cet
+artefact} et \textbf{PC2 contiendra l'effet chimique de la concentration en
+titrant}. Il faut donc regarder \emph{plusieurs} composantes, pas seulement
+PC1.
+\end{attention}
+
+\subsubsection{PC3 et suivantes}
+
+Capturent des effets de plus en plus mineurs. En pratique, dans les spectres
+Raman/SERS :
+\begin{itemize}
+  \item PC1--PC2 : les deux principaux effets (ligne de base + chimie, ou deux
+        effets chimiques distincts).
+  \item PC3--PC5 : effets secondaires, variations locales.
+  \item Au-delà de PC5 : \textbf{bruit de mesure} dans la plupart des cas.
+\end{itemize}
+
+Le \og coude\fg{} du graphe des valeurs propres (\textit{scree plot}) indique
+généralement combien de composantes sont physiquement significatives.
+
+\subsection{Interpréter un loading en détail}
+
+Le loading $\vv_k \in \mathbb{R}^p$ de la composante PC$_k$ est un vecteur
+de $p$ coefficients, un par nombre d'onde. On peut le \textbf{tracer en
+fonction du Raman Shift} exactement comme un spectre expérimental.
+
+\[
+\vv_1 = \bigl[\underbrace{0{,}02}_{\nu_1},\;
+              \underbrace{-0{,}01}_{\nu_2},\;
+              0{,}00,\;
+              \underbrace{0{,}15}_{\nu_4},\;
+              \ldots,\;
+              \underbrace{0{,}08}_{\nu_{1000}}\bigr]
+\]
+
+\paragraph{Règle d'interprétation des coefficients du loading :}
+
+\begin{itemize}
+  \item Coefficient \textbf{grand positif} à $\nu_j$ : PC1 est très sensible
+        à l'intensité à $\nu_j$. Les spectres avec un \emph{score PC1 positif}
+        ont une intensité élevée à cette bande.
+
+  \item Coefficient \textbf{proche de zéro} à $\nu_j$ : PC1 est insensible à
+        cette bande. Elle ne contribue pas à différencier les spectres selon
+        PC1.
+
+  \item Coefficient \textbf{négatif} à $\nu_j$ : les spectres avec un
+        \emph{score PC1 négatif} ont une intensité élevée à $\nu_j$, et
+        vice-versa.
+\end{itemize}
+
+\paragraph{Méthode pratique :}
+\begin{enumerate}
+  \item Tracer le loading comme un spectre ($v_{k,j}$ en ordonnée,
+        $\nu_j$ en abscisse).
+  \item Identifier les pics et les creux, exactement comme pour un spectre
+        expérimental.
+  \item Associer chaque pic à un mode de vibration connu (bases de données
+        Raman, littérature).
+  \item \textbf{Conclusion} : la composante PC$_k$ est dominée par les modes
+        de vibration correspondant aux pics du loading.
+\end{enumerate}
+
+\begin{exemple}
+Si le loading PC2 montre des pics à 1\,100 et 1\,340~\cm, et que ces bandes
+correspondent à des modes de vibration d'un ligand qui chélate le Cu$^{2+}$,
+alors \textbf{PC2 capture la réaction de complexation} entre le ligand et le
+Cu$^{2+}$ — i.e., l'effet chimique de la titration.
+\end{exemple}
+
+\subsection{Interpréter un score en détail}
+
+Le score $s_{i,k}$ du spectre $i$ sur PC$_k$ est sa \og coordonnée\fg{} sur
+l'axe de la $k$-ième composante.
+
+\begin{itemize}
+  \item Score \textbf{très positif} : ce spectre ressemble fortement au pattern
+        décrit par le loading PC$_k$ (intensités élevées aux nombres d'onde à
+        coefficients positifs dans le loading, et basses là où les coefficients
+        sont négatifs).
+
+  \item Score \textbf{proche de zéro} : ce spectre est \og neutre\fg{} par
+        rapport à PC$_k$. Il ne se distingue pas des autres selon cet axe.
+
+  \item Score \textbf{très négatif} : ce spectre est \og opposé\fg{} au
+        pattern de PC$_k$ (intensités élevées là où le loading est négatif).
+\end{itemize}
+
+\paragraph{Relation entre score et loading :}
+Le score est littéralement le \textbf{produit scalaire} entre le spectre
+centré et le loading. C'est une mesure de \textbf{similarité orientée} entre
+le spectre et la direction PC$_k$.
+
+\subsection{Graphe Scores PC1 \textit{vs} PC2 : la clé de l'interprétation}
+
+C'est le graphe le plus important de la PCA. On représente chaque spectre
+par un point de coordonnées $(s_{i,1}, s_{i,2})$, et on \textbf{colorie} les
+points selon une variable de métadonnées (concentration, tube, opérateur\,\ldots).
+
+\paragraph{Questions auxquelles ce graphe répond :}
+
+\begin{enumerate}
+  \item \textbf{Les spectres se séparent-ils selon ma variable d'intérêt ?}
+
+    \begin{itemize}
+      \item Points séparés \emph{le long de PC1} selon la concentration
+            $\Rightarrow$ PC1 capture l'effet chimique de la titration.
+      \item Points séparés \emph{le long de PC2} selon la concentration
+            $\Rightarrow$ l'effet chimique est la 2\ieme\ source de variance
+            (PC1 capturait un artefact).
+      \item Points \emph{mélangés aléatoirement} $\Rightarrow$ la variabilité
+            principale n'est pas liée à la concentration.
+    \end{itemize}
+
+  \item \textbf{Y a-t-il des groupes (clusters) d'échantillons ?}
+    Des points regroupés en nuages distincts indiquent des états chimiques
+    ou physiques différents.
+
+  \item \textbf{Y a-t-il des spectres aberrants (outliers) ?}
+    Un point très éloigné des autres signale un spectre anormal
+    (contamination, problème instrumental, mauvaise baseline\,\ldots).
+\end{enumerate}
+
+\begin{remarque}
+On peut aussi tracer PC1 vs PC3, PC2 vs PC3, etc. Chaque combinaison révèle
+une facette différente de la variabilité.
+\end{remarque}
+
+\subsection{Reconstruction à partir de $N$ composantes}
+
+L'onglet \textbf{PCA --- Reconstruction} permet de reconstituer un spectre à
+partir de $N$ composantes seulement, selon la formule :
+
+\[
+\hat{\mathbf{x}}_i = \xbar + \sum_{k=1}^{N} s_{i,k}\,\vv_k
+\]
+
+où $\xbar$ est le spectre moyen (ajouté après centrage pour revenir dans
+l'espace original).
+
+\paragraph{Comment l'utiliser ?}
+\begin{itemize}
+  \item \textbf{$N = 1$} : on voit uniquement ce que PC1 a capturé dans ce
+        spectre. Si PC1 capturait la ligne de base, le spectre reconstruit
+        ressemble à une ligne de base lisse.
+
+  \item \textbf{$N = 2$} : on ajoute la contribution de PC2. Si PC2 capturait
+        l'effet de la concentration, le spectre reconstruit montre maintenant
+        les pics chimiques en plus.
+
+  \item \textbf{$N = 3$} : on ajoute PC3, etc.
+
+  \item \textbf{$N = p$ (toutes les composantes)} : on retrouve exactement le
+        spectre original (reconstruction parfaite).
+\end{itemize}
+
+\paragraph{Intérêt pratique :}
+En comparant le spectre reconstruit avec $N$ et $N-1$ composantes, on voit
+\textbf{exactement ce qu'ajoute la $N$-ième composante}. C'est la méthode la
+plus directe pour comprendre ce que chaque composante capture physiquement.
+
+\subsection{Variance expliquée et scree plot}
+
+La \textbf{variance expliquée cumulée} est :
+
+\[
+\text{VE}_{\text{cum}}(N) = \sum_{k=1}^{N} \text{VE}_k
+= \frac{\displaystyle\sum_{k=1}^{N} \lambda_k}
+       {\displaystyle\sum_{j=1}^{p} \lambda_j}
+\]
+
+On cherche généralement le plus petit $N$ tel que $\text{VE}_{\text{cum}}(N)
+\geq 90\,\%$ (ou 95\,\% selon les usages).
+
+\medskip
+
+Le \textbf{scree plot} est le graphe des valeurs propres $\lambda_k$ en
+fonction du rang $k$. On cherche le \og coude\fg{} : le point où la courbe
+change nettement de pente, indiquant que les composantes suivantes capturent
+surtout du bruit.
+
+\begin{exemple}
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Composante & VE (\%) & VE cumulée (\%) \\
+\midrule
+PC1 & 72{,}4 & 72{,}4 \\
+PC2 & 14{,}8 & 87{,}2 \\
+PC3 &  5{,}6 & 92{,}8 \\
+PC4 &  2{,}1 & 94{,}9 \\
+PC5 &  1{,}3 & 96{,}2 \\
+\midrule
+PC6--PC15 &  3{,}8 & 100{,}0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+Le coude est entre PC3 et PC4 : 3 composantes expliquent 92{,}8\,\% de la
+variance, et PC4--PC15 n'apportent que 7{,}2\,\% supplémentaires. On retiendra
+donc 3 composantes.
+\end{exemple}
+
+\subsection{PCA corrélée \textit{vs} PCA libre}
+
+L'onglet Exploration propose deux modes de PCA :
+
+\subsubsection{PCA corrélée}
+
+La PCA est appliquée uniquement sur la \textbf{matrice des intensités aux pics
+sélectionnés}. Si 5 pics sont définis, la matrice est $n \times 5$.
+
+\begin{itemize}
+  \item \textbf{Avantages} : très rapide, facile à interpréter (5 variables
+        seulement), moins sensible au bruit hors des pics.
+  \item \textbf{Inconvénients} : dépend fortement du choix des pics. Si un
+        pic pertinent est oublié, l'information est perdue.
+\end{itemize}
+
+\subsubsection{PCA libre}
+
+La PCA est appliquée sur la \textbf{matrice complète des spectres normalisés}
+($n \times p$, avec $p \approx 1\,000$).
+
+\begin{itemize}
+  \item \textbf{Avantages} : ne suppose aucun choix a priori de pics.
+        L'algorithme trouve lui-même les régions spectrales les plus
+        discriminantes (via les loadings). Idéal en mode exploratoire.
+  \item \textbf{Inconvénients} : plus sensible au bruit large bande,
+        les loadings sont plus difficiles à interpréter car ils impliquent
+        1\,000 coefficients.
+\end{itemize}
+
+\begin{attention}
+Dans la \textbf{PCA libre}, les spectres sont normalisés par leur norme
+vectorielle avant la décomposition. Cela garantit que les différences
+d'intensité globale (puissance laser variable) ne dominent pas les composantes.
+\end{attention}
+\newpage
+\subsection{Résumé pratique}
+
+\begin{table}[h!]
+  \centering
+  \caption{Résumé des éléments à analyser en PCA.}
+  \label{tab:pca_summary}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{Élément} & \textbf{Ce que ça dit} \\
+    \midrule
+    Loading PC$_k$ tracé comme spectre
+      & Quelles bandes Raman portent la composante $k$. Les pics du loading
+        correspondent aux modes de vibration les plus discriminants. \\
+    \addlinespace
+    Score PC$_k$ d'un spectre
+      & À quel point ce spectre ressemble au pattern décrit par le loading
+        de PC$_k$. Valeur positive = forte ressemblance, négative = opposé. \\
+    \addlinespace
+    Graphe scores PC1 vs PC2, coloré par variable
+      & La PCA sépare-t-elle les échantillons selon la chimie ? Permet de
+        détecter des groupes, des tendances, des outliers. \\
+    \addlinespace
+    Variance expliquée (ex. 72\,\%)
+      & PC1 résume 72\,\% de toute la variabilité entre spectres. Plus c'est
+        élevé, plus la composante est importante. \\
+    \addlinespace
+    Scree plot
+      & Graphe des valeurs propres : le coude indique combien de composantes
+        sont significatives (au-delà = bruit). \\
+    \addlinespace
+    Reconstruction avec $N$ composantes
+      & Permet de visualiser exactement ce que les $N$ premières composantes
+        ont capturé dans un spectre donné. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ===========================================================================
+\section{Génération de volumes gaussiens}
+\label{sec:gauss}
+% ===========================================================================
+
+L'outil \textbf{Générer volumes (gaussien)} (bouton dans l'onglet Métadonnées)
+calcule automatiquement les volumes de titrant à pipeter dans chaque tube pour
+réaliser une titration SERS autour de l'équivalence chimique. Cette section
+décrit en détail chaque paramètre, le calcul des volumes de chaque solution,
+et le comportement en mode compte-goutte.
+
+\subsection{Architecture d'un tube expérimental}
+
+Chaque tube contient exactement \textbf{six composants}. Deux varient d'un
+tube à l'autre (A et B), les quatre autres sont identiques dans tous les tubes
+(C, D, E, F) :
+
+\begin{table}[h!]
+  \centering
+  \caption{Composition d'un tube expérimental.}
+  \label{tab:solutions}
+  \begin{tabularx}{\textwidth}{llXl}
+    \toprule
+    \textbf{Solution} & \textbf{Rôle} & \textbf{Description} & \textbf{Volume} \\
+    \midrule
+    A & Tampon         & Complément pour maintenir $V_\text{tot}$ constant & Variable \\
+    B & Titrant        & Substance dont on fait varier la quantité & Variable \\
+    C & Indicateur     & Volume fixe, identique dans tous les tubes & Fixe \\
+    D & PEG            & Volume fixe, identique dans tous les tubes & Fixe \\
+    E & Nanoparticules & Volume fixe, identique dans tous les tubes & Fixe \\
+    F & Crosslinker    & Volume fixe, identique dans tous les tubes & Fixe \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+De plus, l'échantillon lui-même (Cu$^{2+}$) est présent en volume $V_\text{échant}$
+identique dans tous les tubes.
+
+\medskip
+
+Le volume total d'un tube $j$ est donc :
+\[
+V_\text{tot,\,j} = V_\text{échant} + V_{A,j} + V_{B,j}
+                   + V_C + V_D + V_E + V_F
+\]
+
+Comme les solutions C, D, E, F et l'échantillon ont le même volume dans tous
+les tubes, on définit :
+\[
+V_\text{fixe} = V_\text{échant} + V_C + V_D + V_E + V_F
+\]
+
+et le volume disponible pour A et B dans chaque tube est :
+\[
+V_{AB} = V_\text{tot} - V_\text{fixe}
+\]
+
+La contrainte fondamentale est que \textbf{tous les tubes ont le même volume
+total} $V_\text{tot}$, ce qui impose :
+\[
+V_{A,j} + V_{B,j} = V_{AB} \quad \forall j
+\]
+
+\subsection{Paramètres du dialogue}
+
+\subsubsection{Paramètres principaux}
+
+\begin{description}
+  \item[\textbf{Nombre de tubes} $N$] Nombre total de tubes (2--200,
+        défaut~: 11). Inclut éventuellement le tube à 0~µL et le tube
+        dupliqué.
+
+  \item[\textbf{C0 Cu (nM)}] Concentration initiale de Cu$^{2+}$ dans
+        l'échantillon pur, en nanomolaires. Sert à calculer la quantité de
+        matière de Cu$^{2+}$ par tube :
+        \[
+          n_\text{Cu} = C_0\,[\text{nM}] \times 10^{-9} \times
+                        V_\text{échant}\,[\mu\text{L}] \times 10^{-6}
+                      \quad [\text{mol}]
+        \]
+
+  \item[\textbf{V échantillon (µL)}] Volume d'échantillon par tube,
+        identique pour tous. C'est le volume qui fixe $n_\text{Cu}$
+        (et donc $V_\text{eq}$).
+
+  \item[\textbf{C titrant (µM)}] Concentration du stock de titrant
+        (Solution B), en micromolaires.
+
+  \item[\textbf{V total par tube (µL)}] Volume final souhaité dans chaque
+        tube (défaut~: 3\,090~µL). Sert à calculer $V_{AB}$.
+\end{description}
+
+\subsubsection{Solutions fixes (C, D, E, F)}
+
+Pour chaque solution fixe, on saisit :
+\begin{itemize}
+  \item $V_X$ : le volume (µL) à pipeter dans chaque tube,
+  \item $C_X^\text{stock}$ : la concentration du stock dans l'unité choisie
+        (M, mM, µM, nM ou \% en masse).
+\end{itemize}
+
+\paragraph{Indépendance des champs volume et concentration.}
+Les champs $V_X$ et $C_X^\text{stock}$ sont \textbf{entièrement indépendants} :
+modifier l'un n'affecte pas l'autre. Cela permet d'ajuster librement la
+concentration du stock ou le volume pipetté sans contrainte automatique.
+Le bouton \textbf{Quantités de matière\,\ldots} permet, si besoin, de
+consulter ou de modifier directement la quantité de matière $n_X$ résultante
+(cf.\ section~\ref{subsec:qmol}).
+
+\paragraph{Concentrations finales dans les tubes.}
+La concentration finale de la solution $X$ dans le tube $j$ est calculée
+par dilution :
+\[
+C_{X,j}^\text{final} = C_X^\text{stock} \times \frac{V_X}{V_\text{tot,\,j}}
+\]
+
+\subsubsection{Contraintes de pipetage}
+
+\begin{description}
+  \item[\textbf{Marge (µL)}] Volume minimal et maximal pour le titrant. Le
+        générateur garantit :
+        \[
+          V_\text{min} = \Delta V_\text{marge}
+          \qquad
+          V_\text{max} = V_{AB} - \Delta V_\text{marge}
+        \]
+        Défaut~: 20~µL. La marge évite les volumes trop petits ou trop
+        grands, non pipetables avec précision.
+
+  \item[\textbf{Pas pipette (µL)}] Résolution minimale de la pipette. Tous
+        les volumes générés sont arrondis à ce pas (défaut~: 1~µL).
+
+  \item[\textbf{Inclure un tube à 0~µL de titrant}] Si coché, le premier
+        tube contient $V_B = 0$ (contrôle sans titrant). Ce tube compte dans
+        $N$ : il reste $N - 1$ tubes libres (ou $N - 2$ si \og dupliquer\fg{}
+        est aussi coché).
+
+  \item[\textbf{Dupliquer le dernier volume}] Si coché, le dernier tube est
+        un réplicat du tube précédant (même $V_B$). Ce tube est annoté
+        \og Contrôle\fg{} dans la correspondance spectres~$\leftrightarrow$~tubes.
+\end{description}
+
+\subsection{Calcul du volume d'équivalence chimique}
+
+L'équivalence chimique est atteinte lorsque la quantité de matière de titrant
+ajoutée égale exactement celle de l'analyte (Cu$^{2+}$). Puisque tous les
+tubes contiennent le même volume d'échantillon :
+\[
+n_\text{Cu} = C_0 \times V_\text{échant}
+\]
+
+le volume d'équivalence pour le titrant est :
+\[
+\boxed{
+V_\text{eq} = \frac{n_\text{Cu}}{C_\text{titrant}}
+            = \frac{C_0\,[\text{nM}] \times 10^{-9}
+                   \times V_\text{échant}\,[\mu\text{L}] \times 10^{-6}}
+                  {C_\text{titrant}\,[\mu\text{M}] \times 10^{-6}}
+            \times 10^6
+            \quad [\mu\text{L}]
+}
+\]
+
+\begin{exemple}
+$C_0 = 1000$~nM, $V_\text{échant} = 1000$~µL, $C_\text{titrant} = 5$~µM~:
+\[
+n_\text{Cu} = 1000 \times 10^{-9} \times 1000 \times 10^{-6}
+            = 10^{-6}~\text{mol}
+\]
+\[
+V_\text{eq} = \frac{10^{-6}}{5 \times 10^{-6}} \times 10^6
+            = 200~\mu\text{L}
+\]
+Le tube d'équivalence reçoit 200~µL de titrant.
+\end{exemple}
+
+\subsection{Génération des volumes par quantiles gaussiens}
+
+\subsubsection{Nombre de tubes libres}
+
+Le nombre de volumes \emph{librement calculés} par l'algorithme (ni le
+tube à 0~µL ni le tube dupliqué) est :
+\[
+N_\text{libre} = N - \mathbf{1}[\text{include\_zero}]
+                   - \mathbf{1}[\text{duplicate\_last}]
+\]
+
+\subsubsection{Quantiles de la loi normale}
+
+On génère $N_\text{libre}$ probabilités uniformément espacées dans $]0,1[$ :
+\[
+p_i = \frac{i - 0{,}5}{N_\text{libre}}, \quad i = 1, \ldots, N_\text{libre}
+\]
+
+puis on les transforme en positions gaussiennes normalisées via la
+\textbf{fonction quantile} (inverse de la CDF) de la loi normale standard :
+\[
+z_i = \Phi^{-1}(p_i)
+\]
+
+Exemples de valeurs : $p = 0{,}5 \Rightarrow z = 0$~;
+$p = 0{,}16 \Rightarrow z \approx -1$~;
+$p = 0{,}84 \Rightarrow z \approx +1$.
+
+Cette transformation produit automatiquement \textbf{plus de points
+proches de $z = 0$} (correspondant à $V_\text{eq}$) et moins aux
+extrémités, reproduisant le comportement souhaité d'une titration réelle.
+
+\subsubsection{Déformation pour concentrer les points autour de $V_\text{eq}$}
+
+Les quantiles $z_i$ sont déformés par une puissance $\gamma > 0$ :
+\[
+z'_i = \text{sign}(z_i) \times |z_i|^\gamma
+\]
+
+\begin{itemize}
+  \item $\gamma = 1$ : distribution gaussienne standard (pas de déformation).
+  \item $\gamma > 1$ : les points proches de 0 se resserrent encore davantage
+        autour de $V_\text{eq}$. Valeur typique~: $\gamma = 1{,}8$.
+  \item $\gamma < 1$ : les points s'espacent au centre.
+\end{itemize}
+
+\subsubsection{Facteur d'échelle $\sigma_V$ et bornes physiques}
+
+Le facteur $\sigma_V$ est choisi de façon à ce qu'aucun volume ne sorte
+de la plage autorisée $[V_\text{min}, V_\text{max}]$ :
+\[
+\sigma_V = \xi \times \min\!\left(
+  \frac{V_\text{max} - V_\text{eq}}{z'_\text{max}},\;
+  \frac{V_\text{eq} - V_\text{min}}{z'_\text{max}}
+\right)
+\quad \text{avec} \quad z'_\text{max} = \max_i |z'_i|
+\]
+
+Le paramètre $\xi \in ]0,1]$ (\texttt{span\_frac}) contrôle le resserrement
+global~: $\xi = 1$ fait atteindre les bornes, $\xi < 1$ reserre la
+distribution.
+
+\paragraph{Pourquoi le minimum et non le maximum ?}
+Utiliser le minimum garantit que les volumes ne \emph{dépassent ni d'un
+côté ni de l'autre}. Si $V_\text{eq}$ est proche d'une borne (par exemple
+$V_\text{eq} \ll V_{AB}/2$), le minimum contraint $\sigma_V$ du côté le
+plus serré, évitant tout dépassement.
+
+\subsubsection{Conversion en volumes finaux}
+
+\paragraph{Volumes de titrant (Solution B) :}
+\[
+V_{B,i} = V_\text{eq} + \sigma_V \times z'_i
+\]
+
+\paragraph{Clip dans les bornes physiques :}
+\[
+V_{B,i} \leftarrow \text{clip}(V_{B,i},\; V_\text{min},\; V_\text{max})
+\]
+
+\paragraph{Quantification sur la grille de pipette :}
+\[
+V_{B,i}^* = \text{round}\!\left(\frac{V_{B,i}}{\Delta V_\text{pipette}}\right)
+             \times \Delta V_\text{pipette}
+\]
+
+\paragraph{Ajout du tube à 0~µL et du tube dupliqué (si demandés) :}
+\begin{itemize}
+  \item Si \texttt{include\_zero}~: $V_{B,0} = 0$ est inséré en premier.
+  \item Si \texttt{duplicate\_last}~: $V_{B,N} = V_{B,N-1}$ est ajouté en
+        dernier. Ce tube porte le label \og Contrôle\fg{} dans la correspondance.
+\end{itemize}
+
+La série finale est triée par ordre croissant.
+
+\paragraph{Volumes de tampon A (Solution A) :}
+\[
+V_{A,i} = V_{AB}^* - V_{B,i}^*
+\]
+
+où $V_{AB}^* = \text{round}(V_{AB} / \Delta V_\text{pipette}) \times
+\Delta V_\text{pipette}$ est ajusté sur la grille pour garantir que
+$V_{A,i} + V_{B,i}^*$ est identique dans tous les tubes.
+
+\paragraph{Volume total réel :}
+\[
+V_\text{tot}^\text{réel} = V_\text{fixe} + V_{AB}^*
+\]
+
+Ce volume peut légèrement différer de $V_\text{tot}$ demandé (à cause de
+l'arrondi sur la grille de pipette).
+
+\subsection{Calcul des concentrations finales dans les tubes}
+
+Pour chaque solution $X$ (C, D, E, F, A, B, échantillon) et chaque tube $j$,
+la concentration finale dans la cuvette est :
+\[
+C_{X,j}^\text{final} = C_X^\text{stock} \times \frac{V_{X,j}}{V_\text{tot,\,j}}
+\]
+
+\begin{itemize}
+  \item $V_\text{tot,\,j} = V_\text{échant} + V_{A,j} + V_{B,j} + V_C + V_D + V_E + V_F$
+  \item Pour les solutions B et A, $V_{X,j}$ varie d'un tube à l'autre.
+  \item Pour les solutions C, D, E, F, $V_{X,j} = V_X$ est constant.
+  \item $V_\text{tot,\,j}$ est \textbf{identique} dans tous les tubes (grâce
+        à la contrainte $V_{A,j} + V_{B,j} = V_{AB}^*$), donc les dilutions
+        des solutions fixes sont les mêmes dans tous les tubes.
+\end{itemize}
+
+La première ligne du tableau de concentrations indique le volume total de
+chaque tube (en µL), les lignes suivantes les concentrations finales (en M)
+pour chaque réactif.
+
+\subsection{Mode compte-goutte}
+
+La case à cocher \textbf{Utilisation d'un compte-goutte} applique un
+\textbf{preset} adapté au pipetage par compte-goutte. Après activation,
+tous les champs restent librement modifiables : il s'agit uniquement d'un
+point de départ commode, sans contrainte imposée.
+
+Les valeurs pré-remplies par ce preset sont les suivantes :
+
+\begin{table}[h!]
+  \centering
+  \caption{Modifications appliquées par le mode compte-goutte.}
+  \label{tab:dropper}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Paramètre} & \textbf{Valeur normale} & \textbf{Mode compte-goutte} \\
+    \midrule
+    Pas pipette ($\Delta V_\text{pipette}$) & 1~µL (ajustable) & 40~µL \\
+    Marge ($V_\text{min}$)                 & 20~µL            & 0~µL  \\
+    Volume Solution C                      & 30~µL            & 40~µL \\
+    Volume Solution F                      & 60~µL            & 40~µL \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Pourquoi pas = 40 µL ?}
+Un compte-goutte standard délivre environ 40~µL par goutte. Tous les volumes
+doivent donc être des \textbf{multiples de 40~µL}. Le générateur arrondit
+chaque $V_{B,i}$ au multiple de 40~µL le plus proche.
+
+\paragraph{Pourquoi marge = 0 ?}
+Avec un compte-goutte, la valeur minimale pipetable est 0 (on peut ne pas
+mettre de goutte). Il n'y a pas de minimum imposé par la précision de la
+pipette.
+
+\paragraph{Volumes C et F ajustés à 40 µL.}
+Ces solutions sont souvent ajoutées goutte à goutte également. L'application
+les aligne sur le pas du compte-goutte pour que le volume fixe
+$V_\text{fixe}$ reste aussi un multiple de 40~µL.
+
+\paragraph{Liberté de modification.}
+Après avoir coché la case, tous les champs restent éditables~: l'utilisateur
+peut ajuster manuellement chaque valeur si son protocole diffère des valeurs
+par défaut du mode compte-goutte.
+
+\begin{remarque}
+En mode compte-goutte, la résolution des volumes est plus grossière
+(multiples de 40~µL). Le volume d'équivalence $V_\text{eq}$ calculé est
+rarement un multiple exact de 40~µL~; le tube \og d'équivalence\fg{}
+est donc arrondi au multiple le plus proche. Plus le nombre de tubes est
+grand, meilleure sera la couverture autour de $V_\text{eq}$.
+\end{remarque}
+
+\subsection{Dialogue \og Quantités de matière\fg{}}
+\label{subsec:qmol}
+
+Le bouton \textbf{Quantités de matière\ldots} ouvre un sous-dialogue qui
+affiche, pour chaque solution, la quantité de matière $n$ en nmol~:
+\[
+n_X\,[\text{nmol}] = C_X^\text{stock}\,[\text{M}] \times V_X\,[\mu\text{L}]
+                   \times 10^3
+\]
+
+L'utilisateur peut modifier directement $n_X$~; l'application recalcule
+$C_X^\text{stock}$ en conséquence (avec $V_X$ inchangé). Cette vue est utile
+lorsque le protocole est défini en quantités de matière plutôt qu'en
+concentrations.
+
+Un bouton \textbf{Valeurs par défaut} dans le dialogue principal remet
+l'ensemble des paramètres aux valeurs d'usine, sans fermer la fenêtre.
+
+\subsection{Exemple complet numérique}
+
+Protocole~: $N = 5$ tubes, $C_0 = 500$~nM, $V_\text{échant} = 1000$~µL,
+$C_\text{titrant} = 2$~µM, $V_\text{tot} = 3090$~µL, $V_C = 30$, $V_D = 750$,
+$V_E = 750$, $V_F = 60$~µL, marge = 20~µL, pas = 1~µL, 1 tube à 0~µL,
+pas de doublon.
+
+\paragraph{Étape 1 — Volumes fixes :}
+\[
+V_\text{fixe} = 1000 + 30 + 750 + 750 + 60 = 2590~\mu\text{L}
+\]
+\[
+V_{AB} = 3090 - 2590 = 500~\mu\text{L}
+\]
+\[
+V_\text{min} = 20~\mu\text{L}, \qquad V_\text{max} = 480~\mu\text{L}
+\]
+
+\paragraph{Étape 2 — Volume d'équivalence :}
+\[
+n_\text{Cu} = 500 \times 10^{-9} \times 1000 \times 10^{-6} = 5 \times 10^{-7}~\text{mol}
+\]
+\[
+V_\text{eq} = \frac{5 \times 10^{-7}}{2 \times 10^{-6}} \times 10^6 = 250~\mu\text{L}
+\]
+
+\paragraph{Étape 3 — Tubes libres :}
+\[
+N_\text{libre} = 5 - 1 - 0 = 4 \quad \text{(4 tubes à calculer + 1 tube à 0)}
+\]
+
+\paragraph{Étape 4 — Quantiles ($\gamma = 1{,}8$) :}
+
+\begin{center}
+\begin{tabular}{ccccc}
+\toprule
+$i$ & $p_i$ & $z_i = \Phi^{-1}(p_i)$ & $z'_i = \text{sign}(z_i)|z_i|^{1.8}$ & $V_{B,i}$~(µL) \\
+\midrule
+1 & 0,125 & $-1{,}15$ & $-1{,}44$ & 250 $-$ $\sigma \times 1{,}44$ \\
+2 & 0,375 & $-0{,}32$ & $-0{,}12$ & 250 $-$ $\sigma \times 0{,}12$ \\
+3 & 0,625 & $+0{,}32$ & $+0{,}12$ & 250 $+$ $\sigma \times 0{,}12$ \\
+4 & 0,875 & $+1{,}15$ & $+1{,}44$ & 250 $+$ $\sigma \times 1{,}44$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+$z'_\text{max} = 1{,}44$, $\sigma_V = \min\!\left(\frac{230}{1{,}44}, \frac{230}{1{,}44}\right) = 160$~µL
+
+\paragraph{Étape 5 — Volumes finaux :}
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Tube & $V_B$~(µL) & $V_A$~(µL) \\
+\midrule
+Tube 1 (zéro)    &    0 & 500 \\
+Tube 2            &   19 & 481 \\
+Tube 3            &  231 & 269 \\
+Tube 4            &  269 & 231 \\
+Tube 5            &  481 &  19 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Les tubes 3 et 4 encadrent $V_\text{eq} = 250$~µL de près~; les tubes 2 et 5
+couvrent les extrémités. $V_{A,j} + V_{B,j} = 500$~µL dans tous les tubes.
+
+% ===========================================================================
+\section{Formats de fichiers attendus}
+% ===========================================================================
+
+\subsection{Fichiers spectres \texttt{.txt}}
+
+\begin{itemize}
+  \item En-tête contenant une ligne qui commence par \texttt{Pixel;}.
+        Toutes les lignes avant cette ligne sont ignorées.
+  \item \textbf{Séparateur de colonnes} : point-virgule (\texttt{;}).
+  \item \textbf{Séparateur décimal} : virgule (\texttt{,}).
+  \item Colonnes requises après lecture :
+    \begin{itemize}
+      \item \texttt{Raman Shift} : nombres d'onde en cm$^{-1}$.
+      \item \texttt{Dark Subtracted \#1} : intensité brute (après soustraction
+            du fond obscur).
+    \end{itemize}
+  \item Le pipeline produit automatiquement :
+    \begin{itemize}
+      \item \texttt{Intensity\_corrected} $=$ \texttt{Dark Subtracted \#1}
+            $-$ baseline(modpoly).
+      \item \texttt{file} : nom du fichier \texttt{.txt}.
+      \item \texttt{Spectrum name} : nom sans l'extension \texttt{.txt}
+            (clé de jointure avec les métadonnées).
+    \end{itemize}
+\end{itemize}
+
+\paragraph{Validations appliquées automatiquement :}
+\begin{itemize}
+  \item Vérification de la plage physique : $-200 \leq \nu \leq 10\,000$
+        cm$^{-1}$.
+  \item Détection et moyennage des doublons de Raman Shift.
+  \item Tri par Raman Shift croissant.
+  \item Suppression des lignes avec des valeurs manquantes dans les colonnes
+        essentielles.
+\end{itemize}
+
+\subsection{Fichier de métadonnées}
+
+\begin{itemize}
+  \item \textbf{Excel} : \texttt{.xlsx} ou \texttt{.xls} (lu via
+        \texttt{openpyxl}).
+  \item \textbf{CSV} : \texttt{.csv}, séparateur auto-détecté parmi
+        \texttt{,}, \texttt{;} et tabulation, encodage UTF-8 recommandé.
+  \item \textbf{Colonne obligatoire} : \texttt{Spectrum name} (clé de
+        jointure avec les spectres).
+  \item Colonnes utiles :
+    \texttt{Sample description}, \texttt{n(EGTA) (mol)},
+    colonnes de concentration\,\ldots
+\end{itemize}
+
+% ===========================================================================
+\section{Détails techniques (modules)}
+% ===========================================================================
+
+\subsection{\texttt{data\_processing.py}}
+
+Ce module gère le chargement et l'assemblage des données.
+
+\begin{itemize}
+  \item \texttt{load\_spectrum\_file(path, poly\_order=5, apply\_baseline=True)} :
+    \begin{itemize}
+      \item Détecte et ignore l'en-tête jusqu'à la ligne \texttt{Pixel;}.
+      \item Lit le fichier avec séparateur \texttt{;} et décimales \texttt{,}.
+      \item Convertit en numérique, supprime les NaN, trie sur Raman Shift.
+      \item Vérifie la plage physique ($-200$--$10\,000$ cm$^{-1}$) et signale
+            les valeurs suspectes.
+      \item Détecte et moyenne les doublons de Raman Shift.
+      \item Applique la correction de baseline modpoly (si demandée).
+      \item Retourne un DataFrame avec \texttt{Raman Shift},
+            \texttt{Dark Subtracted \#1}, \texttt{Intensity\_corrected},
+            \texttt{file}.
+    \end{itemize}
+
+  \item \texttt{build\_combined\_dataframe\_from\_df(txt\_files, metadata\_df, \ldots)} :
+    \begin{itemize}
+      \item Charge chaque fichier \texttt{.txt} via
+            \texttt{load\_spectrum\_file}.
+      \item Concatène les spectres valides, ajoute \texttt{Spectrum name}.
+      \item Fusion gauche sur \texttt{Spectrum name} avec les métadonnées.
+      \item Retire les contrôles BRB si \texttt{exclude\_brb=True}.
+    \end{itemize}
+
+  \item \texttt{load\_combined\_df(parent, file\_picker, metadata\_creator)} :
+        wrapper gérant toutes les erreurs via \texttt{QMessageBox} (vérifie
+        que les métadonnées et les fichiers sont disponibles, appelle
+        \texttt{build\_merged\_metadata} puis \texttt{build\_combined\_dataframe\_from\_ui}).
+\end{itemize}
+
+\subsection{\texttt{metadata\_model.py}}
+
+Couche données pure (\textbf{aucun import Qt}), testable sans interface
+graphique. Sépare la logique métier de l'interface utilisateur.
+
+\begin{itemize}
+  \item \texttt{to\_float(x)} : conversion robuste d'une valeur quelconque
+        (str avec virgule, espace insécable, NaN, None\,\ldots) en float ou
+        None.
+  \item \texttt{conc\_to\_M(val, unit)} : convertit une concentration en
+        mol/L selon l'unité (M, mM, µM, nM, \ldots).
+  \item \texttt{normalize\_tube\_label(label)} : normalise des variantes
+        d'étiquettes de tube (\texttt{A5}, \texttt{tube05}, \texttt{5},
+        \ldots) vers la forme canonique \texttt{Tube 5}.
+  \item \texttt{norm\_text\_key(s)} : clé de comparaison insensible à la
+        casse et aux accents (é, è, ê, ô, à, â, î, û\,\ldots).
+  \item \texttt{is\_control\_label(label)} : retourne \texttt{True} si le
+        label correspond à \og Contrôle\fg{} ou \og Control\fg{} (tube
+        réplicat).
+  \item \texttt{get\_tube\_columns(df)} : retourne les colonnes \texttt{Tube N}
+        d'un DataFrame, triées par numéro $N$.
+  \item \texttt{infer\_n\_tubes\_for\_mapping(df\_comp)} : déduit le nombre
+        de tubes à partir du tableau des volumes. Fallback : 10 tubes.
+  \item \texttt{tube\_merge\_key\_for\_mapping(label, n\_tubes, df\_comp)} :
+        retourne la clé de jointure entre la correspondance spectres $\leftrightarrow$
+        tubes et le tableau des volumes (\texttt{Contrôle} $\to$ \texttt{Tube N}).
+  \item \texttt{compute\_concentration\_table(df\_comp)} : calcule les
+        concentrations finales dans chaque tube à partir des volumes et des
+        concentrations stock.
+  \item \texttt{build\_merged\_metadata(df\_comp, df\_map)} : fusionne la
+        correspondance spectres $\leftrightarrow$ tubes avec les concentrations
+        calculées. Détecte automatiquement le titrant.
+  \item \texttt{sers\_gaussian\_volumes(\ldots)} : génère la série de volumes
+        de titrant selon la méthode des quantiles gaussiens déformés
+        (cf.\ section~\ref{sec:gauss}).
+\end{itemize}
+
+\subsection{\texttt{metadata\_creator.py}}
+
+Interface Qt pour la saisie des métadonnées. Délègue tous les calculs purs
+à \texttt{metadata\_model}. Contient :
+
+\begin{itemize}
+  \item Tableau des volumes (réactifs $\times$ tubes) avec éditeur interactif,
+        gestion des colonnes par menu contextuel (ajout, suppression,
+        duplication de tubes via clic droit sur l'en-tête de colonne).
+  \item Tableau de correspondance spectres $\leftrightarrow$ tubes, avec
+        synchronisation automatique lors de la modification du tableau des
+        volumes.
+  \item Dialogue de génération de volumes gaussiens
+        (\texttt{GaussianVolumesDialog}) : paramètres principaux, solutions
+        fixes C/D/E/F avec volumes et concentrations indépendants, preset
+        compte-goutte, bouton \textbf{Valeurs par défaut}.
+  \item Feuille de protocole de paillasse (\texttt{ProtocolDialog}) en mode
+        libre et mode guidé, avec export Excel quatre feuilles.
+  \item Sauvegarde et chargement des métadonnées au format \texttt{.xlsx}.
+  \item Méthode \texttt{build\_merged\_metadata()} exposée publiquement pour
+        les autres onglets.
+\end{itemize}
+
+\subsection{\texttt{spectra\_plot.py}}
+
+\begin{itemize}
+  \item Charge le fichier combiné depuis \texttt{metadata\_creator}.
+  \item Filtre sur les fichiers sélectionnés (colonne \texttt{file}).
+  \item Génère une figure Plotly interactive : une courbe par spectre,
+        légende = \texttt{Sample description} si disponible.
+  \item Export haute résolution via \texttt{Plotly.toImage} (PNG $\times 2$,
+        SVG vectoriel) et \texttt{QWebEnginePage.printToPdf} (PDF A4
+        paysage), avec préréglages de taille (A4, A3, personnalisé).
+\end{itemize}
+
+\subsection{\texttt{analysis\_tab.py}}
+
+\begin{itemize}
+  \item Recharge le fichier combiné via \texttt{load\_combined\_df}.
+  \item Propose des jeux de pics prédéfinis (532~nm, 785~nm) et un mode
+        personnalisé (saisie libre des Raman Shifts).
+  \item Calcule l'intensité maximale dans la fenêtre $[\nu_0 \pm \Delta\nu]$
+        pour chaque spectre et chaque pic (tolérance par défaut~: 5~\cm).
+  \item Calcule tous les ratios $I_i / I_j$ pour chaque paire de pics $(i, j)$.
+  \item Fusionne avec les métadonnées et calcule $n(\text{titrant})$ en mol.
+  \item Graphique interactif des ratios en fonction de la quantité de titrant.
+  \item Ajustement sigmoïde par ratio avec affichage du point d'équivalence
+        $x_\text{eq}$ (\texttt{scipy.optimize.curve\_fit}).
+  \item Export Excel avec deux feuilles : \texttt{intensites} et
+        \texttt{ratios}.
+  \item Export graphique haute résolution (PNG, SVG, PDF) via la même
+        infrastructure que \texttt{spectra\_plot.py}.
+\end{itemize}
+
+\subsection{\texttt{plotly\_downloads.py}}
+
+\begin{itemize}
+  \item Utilitaires partagés pour l'export graphique.
+  \item L'export PNG et SVG appelle \texttt{Plotly.toImage} via
+        \texttt{QWebEnginePage.runJavaScript} : le moteur de rendu est
+        identique à l'affichage interactif, sans recours à Kaleido.
+  \item Un mécanisme de polling asynchrone (\texttt{QTimer}) attend la
+        résolution de la promesse JavaScript avant d'écrire le fichier.
+  \item L'export PDF utilise \texttt{QWebEnginePage.printToPdf}.
+\end{itemize}
+
+\subsection{\texttt{peak\_selector.py}}
+
+\begin{itemize}
+  \item Onglet \textbf{Exploration} : normalisation des spectres (norme
+        vectorielle), sélection des pics cibles, tolérance réglable.
+  \item \textbf{PCA corrélée} : PCA sur la matrice $n \times p_\text{pics}$
+        des intensités aux pics.
+  \item \textbf{PCA libre} : PCA sur la matrice normalisée complète
+        ($n \times p$). Les données traitées ($\X$, loadings, scores) sont
+        stockées comme attributs d'instance pour permettre la reconstruction.
+  \item Sous-onglets :
+    \begin{itemize}
+      \item \textit{Scores} : graphe interactif de scores PC$_i$ vs PC$_j$,
+            coloré par variable de métadonnées.
+      \item \textit{Loadings} : graphe des coefficients du loading pour chaque
+            composante, en fonction du Raman Shift.
+      \item \textit{Reconstruction} : reconstruction d'un spectre sélectionnable
+            à partir de $N$ composantes, avec affichage simultané du spectre
+            original.
+    \end{itemize}
+  \item Scatter matrix (matrice de nuages de points entre pics).
+\end{itemize}
+
+% ===========================================================================
+\section{Export et sauvegardes}
+% ===========================================================================
+
+\begin{itemize}
+  \item \textbf{Fichier combiné} : CSV (\texttt{.csv}) ou Excel
+        (\texttt{.xlsx}) au choix dans la boîte de dialogue. Le dernier
+        chemin est mémorisé.
+  \item \textbf{Résultats d'analyse} : Excel (\texttt{.xlsx}), deux feuilles :
+    \begin{itemize}
+      \item \texttt{intensites} : intensité maximale par pic et par spectre.
+      \item \texttt{ratios} : tous les ratios en format long
+            (spectre, pic\_num, pic\_den, ratio, métadonnées).
+    \end{itemize}
+  \item \textbf{Métadonnées et protocole} : Excel (\texttt{.xlsx}),
+        quatre feuilles (\texttt{Protocole}, \texttt{Volumes},
+        \texttt{Correspondance}, \texttt{EtatProtocole}).
+  \item \textbf{Graphiques} (onglets Spectres et Analyse) : PNG haute
+        résolution (facteur $\times 2$), SVG vectoriel ou PDF (A4 paysage),
+        avec choix de la taille de sortie. L'export PNG et SVG utilise
+        \texttt{Plotly.toImage} via JavaScript pour un rendu identique à
+        l'affichage interactif.
+  \item \textbf{Paires de pics} (onglet Exploration) : CSV exportable via
+        le bouton \textbf{Exporter tableau CSV}.
+\end{itemize}
+
+% ===========================================================================
+\section{Bonnes pratiques}
+% ===========================================================================
+
+\begin{enumerate}
+  \item S'assurer que \texttt{Spectrum name} dans les métadonnées correspond
+        exactement aux noms de fichiers \texttt{.txt} (sans extension).
+  \item Utiliser des noms d'échantillons explicites dans \texttt{Sample
+        description} pour des légendes lisibles.
+  \item Travailler en encodage UTF-8 pour les fichiers CSV.
+  \item En PCA, commencer par examiner le graphe Scores coloré par la variable
+        d'intérêt (concentration, tube\,\ldots), puis les Loadings pour
+        comprendre la signification physique des axes.
+  \item Regarder plusieurs composantes (PC1, PC2, PC3) : l'effet chimique
+        recherché n'est pas toujours sur PC1.
+  \item Utiliser la Reconstruction pour vérifier intuitivement ce que chaque
+        composante a capturé.
+  \item Vérifier que la correction de baseline est satisfaisante dans
+        l'onglet Spectres avant toute analyse quantitative.
+\end{enumerate}
+
+% ===========================================================================
+\section{Dépannage (FAQ)}
+% ===========================================================================
+
+\paragraph{L'assemblage échoue avec un fichier de métadonnées.}
+Vérifiez que la colonne \texttt{Spectrum name} est présente et correspond
+exactement aux noms de fichiers \texttt{.txt} (sans extension \texttt{.txt},
+casse exacte). Pour les CSV, vérifiez le séparateur (\texttt{,}, \texttt{;}
+ou tabulation) et l'encodage (UTF-8 recommandé).
+
+\paragraph{Mon fichier combiné n'a pas de colonne \texttt{Intensity\_corrected}.}
+Les fichiers \texttt{.txt} doivent contenir les colonnes \texttt{Raman Shift}
+et \texttt{Dark Subtracted \#1} après la ligne \texttt{Pixel;}. Vérifiez le
+séparateur (\texttt{;}) et le séparateur décimal (\texttt{,}).
+
+\paragraph{Le tracé n'affiche rien dans l'onglet Spectres.}
+Vérifiez que :
+\begin{enumerate}
+  \item l'assemblage a réussi et le fichier combiné a bien été produit,
+  \item les fichiers sélectionnés dans l'onglet \textit{Fichiers} existent
+        dans la colonne \texttt{file} du combiné,
+  \item les colonnes \texttt{Raman Shift} et \texttt{Intensity\_corrected}
+        sont présentes.
+\end{enumerate}
+
+\paragraph{L'analyse des pics signale des colonnes manquantes.}
+Le fichier combiné doit au minimum contenir \texttt{Raman Shift},
+\texttt{Intensity\_corrected} et \texttt{file}. Pour le graphique des ratios,
+la variable de métadonnées sélectionnée (ex. \texttt{n(EGTA) (mol)}) doit
+également être présente.
+
+\paragraph{La PCA n'affiche rien ou plante.}
+Il faut au moins 2 spectres et que le nombre de composantes demandé ne
+dépasse pas le nombre de spectres (ou le nombre de pics pour la PCA
+corrélée). Vérifiez que l'assemblage a réussi avant de lancer l'analyse.
+
+\paragraph{Les spectres contrôle n'apparaissent pas dans la PCA.}
+Le label \texttt{Contrôle} dans le tableau de correspondance doit être
+orthographié exactement ainsi (avec la majuscule initiale). Il est mappé
+automatiquement au dernier tube du tableau des volumes.
+
+\paragraph{L'export PDF ne correspond pas à l'affichage interactif.}
+Le PDF est généré par le moteur d'impression Qt (\texttt{printToPdf}),
+qui peut introduire de légères différences de mise en page selon le système.
+Pour un rendu pixel-perfect identique à ce qui est affiché à l'écran,
+préférez l'export \textbf{PNG haute résolution} ou \textbf{SVG vectoriel},
+qui utilisent directement l'API JavaScript de Plotly.
+
+% ===========================================================================
+\section{Crédits et licence}
+% ===========================================================================
+
+\begin{itemize}
+  \item \textbf{Développement} : Alexandre Souchaud, CitizenSers.
+  \item \textbf{Correction de baseline} : bibliothèque \texttt{pybaselines}
+        (\url{https://github.com/derb12/pybaselines}).
+  \item \textbf{Interface graphique} : PySide6 / Qt.
+  \item \textbf{Graphiques interactifs} : Plotly.
+  \item \textbf{PCA} : scikit-learn (\texttt{sklearn.decomposition.PCA}).
+  \item \textbf{Statistiques} : NumPy, pandas, SciPy.
+\end{itemize}
+
+\medskip
+Projet académique / interne --- CitizenSers. Tous droits réservés.
+
+\end{document}

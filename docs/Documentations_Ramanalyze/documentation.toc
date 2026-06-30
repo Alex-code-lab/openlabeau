@@ -1,0 +1,110 @@
+\babel@toc {french}{}\relax 
+\contentsline {section}{\numberline {1}Aperçu général}{4}{section.1}%
+\contentsline {section}{\numberline {2}Fonctionnalités principales}{4}{section.2}%
+\contentsline {section}{\numberline {3}Structure du dépôt}{5}{section.3}%
+\contentsline {section}{\numberline {4}Installation}{5}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Prérequis}{5}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Environnement virtuel et dépendances}{5}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Lancement}{6}{subsection.4.3}%
+\contentsline {section}{\numberline {5}Guide d'utilisation (pas à pas)}{6}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Onglet Fichiers}{6}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Onglet Métadonnées}{6}{subsection.5.2}%
+\contentsline {subsubsection}{\numberline {5.2.1}Saisie des volumes}{6}{subsubsection.5.2.1}%
+\contentsline {subsubsection}{\numberline {5.2.2}Correspondance spectres $\leftrightarrow $ tubes}{7}{subsubsection.5.2.2}%
+\contentsline {subsubsection}{\numberline {5.2.3}Assemblage}{7}{subsubsection.5.2.3}%
+\contentsline {subsubsection}{\numberline {5.2.4}Feuille de protocole de paillasse}{7}{subsubsection.5.2.4}%
+\contentsline {paragraph}{Structure du tableau.}{7}{section*.2}%
+\contentsline {paragraph}{Mode guidé.}{7}{section*.3}%
+\contentsline {paragraph}{Workflow coordinateur / opérateur.}{8}{section*.4}%
+\contentsline {paragraph}{Export : fichier unifié (4 feuilles).}{8}{section*.5}%
+\contentsline {paragraph}{Persistance et rechargement.}{8}{section*.6}%
+\contentsline {subsection}{\numberline {5.3}Onglet Spectres}{8}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Onglet Analyse}{9}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Onglet Exploration (PCA)}{9}{subsection.5.5}%
+\contentsline {subsubsection}{\numberline {5.5.1}Sous-onglets disponibles}{9}{subsubsection.5.5.1}%
+\contentsline {subsubsection}{\numberline {5.5.2}Paramètres}{9}{subsubsection.5.5.2}%
+\contentsline {subsubsection}{\numberline {5.5.3}Workflow typique}{10}{subsubsection.5.5.3}%
+\contentsline {section}{\numberline {6}Comprendre la PCA en spectroscopie Raman}{10}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Motivation : pourquoi la PCA ?}{10}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Calcul pas à pas : de la matrice de spectres aux composantes}{11}{subsection.6.2}%
+\contentsline {subsubsection}{\numberline {6.2.1}Étape 1 --- Construction de la matrice de données}{11}{subsubsection.6.2.1}%
+\contentsline {subsubsection}{\numberline {6.2.2}Étape 2 --- Centrage de la matrice}{11}{subsubsection.6.2.2}%
+\contentsline {subsubsection}{\numberline {6.2.3}Étape 3 --- Matrice de covariance}{12}{subsubsection.6.2.3}%
+\contentsline {subsubsection}{\numberline {6.2.4}Étape 4 --- Décomposition en valeurs propres}{12}{subsubsection.6.2.4}%
+\contentsline {subsubsection}{\numberline {6.2.5}Étape 5 --- Calcul des scores}{13}{subsubsection.6.2.5}%
+\contentsline {subsection}{\numberline {6.3}Interprétation géométrique}{14}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Ce que signifient PC1, PC2, PC3\,\ldots }{15}{subsection.6.4}%
+\contentsline {subsubsection}{\numberline {6.4.1}PC1 : la plus grande source de variabilité}{15}{subsubsection.6.4.1}%
+\contentsline {subsubsection}{\numberline {6.4.2}PC2 : la deuxième source de variabilité}{15}{subsubsection.6.4.2}%
+\contentsline {subsubsection}{\numberline {6.4.3}PC3 et suivantes}{15}{subsubsection.6.4.3}%
+\contentsline {subsection}{\numberline {6.5}Interpréter un loading en détail}{16}{subsection.6.5}%
+\contentsline {paragraph}{Règle d'interprétation des coefficients du loading :}{16}{section*.7}%
+\contentsline {paragraph}{Méthode pratique :}{16}{section*.8}%
+\contentsline {subsection}{\numberline {6.6}Interpréter un score en détail}{16}{subsection.6.6}%
+\contentsline {paragraph}{Relation entre score et loading :}{17}{section*.9}%
+\contentsline {subsection}{\numberline {6.7}Graphe Scores PC1 \textit {vs} PC2 : la clé de l'interprétation}{17}{subsection.6.7}%
+\contentsline {paragraph}{Questions auxquelles ce graphe répond :}{17}{section*.10}%
+\contentsline {subsection}{\numberline {6.8}Reconstruction à partir de $N$ composantes}{17}{subsection.6.8}%
+\contentsline {paragraph}{Comment l'utiliser ?}{18}{section*.11}%
+\contentsline {paragraph}{Intérêt pratique :}{18}{section*.12}%
+\contentsline {subsection}{\numberline {6.9}Variance expliquée et scree plot}{18}{subsection.6.9}%
+\contentsline {subsection}{\numberline {6.10}PCA corrélée \textit {vs} PCA libre}{19}{subsection.6.10}%
+\contentsline {subsubsection}{\numberline {6.10.1}PCA corrélée}{19}{subsubsection.6.10.1}%
+\contentsline {subsubsection}{\numberline {6.10.2}PCA libre}{19}{subsubsection.6.10.2}%
+\contentsline {subsection}{\numberline {6.11}Résumé pratique}{20}{subsection.6.11}%
+\contentsline {section}{\numberline {7}Génération de volumes gaussiens}{20}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Architecture d'un tube expérimental}{20}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Paramètres du dialogue}{21}{subsection.7.2}%
+\contentsline {subsubsection}{\numberline {7.2.1}Paramètres principaux}{21}{subsubsection.7.2.1}%
+\contentsline {subsubsection}{\numberline {7.2.2}Solutions fixes (C, D, E, F)}{22}{subsubsection.7.2.2}%
+\contentsline {paragraph}{Contrainte de quantité de matière fixe.}{22}{section*.13}%
+\contentsline {paragraph}{Concentrations finales dans les tubes.}{22}{section*.14}%
+\contentsline {subsubsection}{\numberline {7.2.3}Contraintes de pipetage}{22}{subsubsection.7.2.3}%
+\contentsline {subsection}{\numberline {7.3}Calcul du volume d'équivalence chimique}{22}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Génération des volumes par quantiles gaussiens}{23}{subsection.7.4}%
+\contentsline {subsubsection}{\numberline {7.4.1}Nombre de tubes libres}{23}{subsubsection.7.4.1}%
+\contentsline {subsubsection}{\numberline {7.4.2}Quantiles de la loi normale}{23}{subsubsection.7.4.2}%
+\contentsline {subsubsection}{\numberline {7.4.3}Déformation pour concentrer les points autour de $V_\text {eq}$}{23}{subsubsection.7.4.3}%
+\contentsline {subsubsection}{\numberline {7.4.4}Facteur d'échelle $\sigma _V$ et bornes physiques}{24}{subsubsection.7.4.4}%
+\contentsline {paragraph}{Pourquoi le minimum et non le maximum ?}{24}{section*.15}%
+\contentsline {subsubsection}{\numberline {7.4.5}Conversion en volumes finaux}{24}{subsubsection.7.4.5}%
+\contentsline {paragraph}{Volumes de titrant (Solution B) :}{24}{section*.16}%
+\contentsline {paragraph}{Clip dans les bornes physiques :}{24}{section*.17}%
+\contentsline {paragraph}{Quantification sur la grille de pipette :}{24}{section*.18}%
+\contentsline {paragraph}{Ajout du tube à 0~µL et du tube dupliqué (si demandés) :}{24}{section*.19}%
+\contentsline {paragraph}{Volumes de tampon A (Solution A) :}{25}{section*.20}%
+\contentsline {paragraph}{Volume total réel :}{25}{section*.21}%
+\contentsline {subsection}{\numberline {7.5}Calcul des concentrations finales dans les tubes}{25}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Mode compte-goutte}{25}{subsection.7.6}%
+\contentsline {paragraph}{Pourquoi pas = 40 µL ?}{26}{section*.22}%
+\contentsline {paragraph}{Pourquoi marge = 0 ?}{26}{section*.23}%
+\contentsline {paragraph}{Volumes C et F ajustés à 40 µL.}{26}{section*.24}%
+\contentsline {paragraph}{Liberté de modification.}{26}{section*.25}%
+\contentsline {subsection}{\numberline {7.7}Dialogue \@FB@og Quantités de matière\@FB@fg \relax {}}{26}{subsection.7.7}%
+\contentsline {subsection}{\numberline {7.8}Exemple complet numérique}{26}{subsection.7.8}%
+\contentsline {paragraph}{Étape 1 — Volumes fixes :}{26}{section*.26}%
+\contentsline {paragraph}{Étape 2 — Volume d'équivalence :}{27}{section*.27}%
+\contentsline {paragraph}{Étape 3 — Tubes libres :}{27}{section*.28}%
+\contentsline {paragraph}{Étape 4 — Quantiles ($\gamma = 1{,}8$) :}{27}{section*.29}%
+\contentsline {paragraph}{Étape 5 — Volumes finaux :}{27}{section*.30}%
+\contentsline {section}{\numberline {8}Formats de fichiers attendus}{27}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Fichiers spectres \texttt {.txt}}{27}{subsection.8.1}%
+\contentsline {paragraph}{Validations appliquées automatiquement :}{28}{section*.31}%
+\contentsline {subsection}{\numberline {8.2}Fichier de métadonnées}{28}{subsection.8.2}%
+\contentsline {section}{\numberline {9}Détails techniques (modules)}{28}{section.9}%
+\contentsline {subsection}{\numberline {9.1}\texttt {data\_processing.py}}{28}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}\texttt {metadata\_model.py}}{29}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}\texttt {metadata\_creator.py}}{30}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}\texttt {spectra\_plot.py}}{30}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}\texttt {analysis\_tab.py}}{30}{subsection.9.5}%
+\contentsline {subsection}{\numberline {9.6}\texttt {peak\_selector.py}}{31}{subsection.9.6}%
+\contentsline {section}{\numberline {10}Export et sauvegardes}{31}{section.10}%
+\contentsline {section}{\numberline {11}Bonnes pratiques}{31}{section.11}%
+\contentsline {section}{\numberline {12}Dépannage (FAQ)}{32}{section.12}%
+\contentsline {paragraph}{L'assemblage échoue avec un fichier de métadonnées.}{32}{section*.32}%
+\contentsline {paragraph}{Mon fichier combiné n'a pas de colonne \texttt {Intensity\_corrected}.}{32}{section*.33}%
+\contentsline {paragraph}{Le tracé n'affiche rien dans l'onglet Spectres.}{32}{section*.34}%
+\contentsline {paragraph}{L'analyse des pics signale des colonnes manquantes.}{32}{section*.35}%
+\contentsline {paragraph}{La PCA n'affiche rien ou plante.}{32}{section*.36}%
+\contentsline {paragraph}{Les spectres contrôle n'apparaissent pas dans la PCA.}{32}{section*.37}%
+\contentsline {section}{\numberline {13}Crédits et licence}{33}{section.13}%

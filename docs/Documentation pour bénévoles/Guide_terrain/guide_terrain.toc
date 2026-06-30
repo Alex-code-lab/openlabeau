@@ -1,0 +1,22 @@
+\babel@toc {french}{}\relax 
+\contentsline {section}{\numberline {1}Avant de commencer}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}À quoi servent ces informations ?}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Deux méthodes au choix}{2}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Le nom du prélèvement}{3}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}Le nom de la titration}{3}{subsection.1.4}%
+\contentsline {section}{\numberline {2}Méthode 1 — Logiciel Ramanalyze}{5}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Charger une fiche existante (optionnel)}{5}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Section 1 : Identification du prélèvement}{5}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Section 2 : Localisation}{6}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Section 3 : Contexte terrain}{7}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Section 4 : Mesures terrain}{8}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}Section 5 : Titration du cuivre}{9}{subsection.2.6}%
+\contentsline {subsection}{\numberline {2.7}Enregistrer la fiche}{9}{subsection.2.7}%
+\contentsline {section}{\numberline {3}Méthode 2 — Fichier Excel \texttt {modèle final.xlsx}}{11}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Bloc d'identification (lignes 1 à 7)}{13}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Bloc préleveur·ses (lignes 8 et suivantes)}{13}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Cases à cocher — statut des mesures}{13}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Sections de mesures}{14}{subsection.3.4}%
+\contentsline {section}{\numberline {4}Récapitulatif et checklist}{16}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Checklist de saisie terrain}{16}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}En cas de doute}{16}{subsection.4.2}%

@@ -324,7 +324,7 @@ class MainWindow(QMainWindow):
 <ol>
   <li><span class="key">Ma fiche terrain</span> - créez ou rechargez la fiche, puis enregistrez-la en <span class="mono">.xlsx</span>.</li>
   <li><span class="key">Fichiers Raman</span> - ajoutez les fichiers <span class="mono">.txt</span> si une acquisition Raman/SERS a été réalisée.</li>
-  <li><span class="key">Spectres</span> - contrôlez visuellement les spectres et la correction de baseline.</li>
+  <li><span class="key">Visualiseur</span> - regardez les spectres tracés pour vérifier qu'ils sont propres.</li>
   <li><span class="key">Analyse</span> - choisissez la longueur d'onde du spectromètre, ajustez les ratios et lancez l'ajustement mathématique de la courbe.</li>
 </ol>
 
@@ -456,9 +456,9 @@ class MainWindow(QMainWindow):
   <li>Utilisez <b>Retirer</b> ou <b>Vider la liste</b> si nécessaire.</li>
 </ul>
 
-<h3>3 - Onglet Spectres</h3>
+<h3>3 - Onglet Visualiseur</h3>
 <ul>
-  <li>Affiche les spectres corrigés et permet de contrôler rapidement les profils.</li>
+  <li>Affiche les spectres bruts et permet de contrôler rapidement les profils.</li>
   <li>La visualisation interactive permet de zoomer, comparer et exporter une figure.</li>
   <li>Un résultat incohérent doit d'abord faire vérifier la correspondance spectres ↔ tubes et la baseline.</li>
 </ul>
@@ -523,7 +523,7 @@ class MainWindow(QMainWindow):
 <div class="note">
   <b>Vous réalisez aussi une titration du cuivre (mesure Raman)&nbsp;?</b><br>
   Cochez <b>Titration</b> dans la fiche terrain&nbsp;: des onglets supplémentaires
-  (Fichiers Raman, Spectres, Analyse) apparaissent alors pour la suite.
+  (Fichiers Raman, Visualiseur, Analyse) apparaissent alors pour la suite.
   Sinon, vous n'avez pas à vous en occuper.
 </div>
 
